@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  三条工務店 ビジネス版MBTI適性診断（単一ファイル版）
+  ============================================================================
+  ■ 目的
+    採用選考の場で応募者に受けてもらう参考ツール。合否判定には使わない。
+    回答はブラウザのメモリ上のみで処理し、外部送信・保存は一切行わない。
+
+  ■ 編集ガイド（カスタマイズしたい場合はここを編集）
+    1. スコア合成比率・下限:
+         ANSWER_RATIO  … 回答スコアの比率（残りがタイプ補正）。既定 0.75
+         SCORE_FLOOR   … スコア下限の底上げ値。既定 40（40〜100%に圧縮）
+    2. 質問の編集（全76問 = 共通60問 + タイプ別16問）:
+         COMMON_QUESTIONS  … 全タイプ共通の基礎質問60問（10カテゴリ×6問）
+         LETTER_QUESTIONS  … E/I/S/N/T/F/J/P 各文字ごとの出し分け質問（各4問）
+         各質問は { text, cat, rev } 形式。
+           cat: "stress"(ストレス耐性) / "nego"(対人折衝) / "acc"(正確性) /
+                "team"(チームワーク・誠実性) / "adapt"(変化対応・段取り) /
+                "drive"(目標達成意欲) / "create"(創造性・デザイン感覚) /
+                "empathy"(傾聴・共感力) / "plan"(企画・分析・発信) /
+                "learn"(学習意欲・成長志向)
+           rev: true にすると逆転項目（回答値を 6-値 で反転）
+    3. 部署別のカテゴリ重み: DEPT_WEIGHTS
+    4. カルチャーフィットのカテゴリ重み: CULTURE_WEIGHTS
+    5. タイプごとの部署補正(0-100): TYPE_BONUS
+    6. タイプ解説文: TYPE_PROFILES
+    7. カテゴリ別の詳細コメント(強み/安定/伸びしろの3段階): CATEGORY_COMMENTS
+    8. 回答スタイル分析の判定しきい値・文言: ANSWER_STYLE_METRICS
+
+  ■ 動作確認手順
+    ・このファイルをブラウザ（Chrome/Safari/Edge）でダブルクリックで開くだけ。
+    ・GitHub Pages: リポジトリにこのファイルを index.html として置き、
+      Settings > Pages で公開ブランチを指定すれば URL で配布できる。
+  ============================================================================
+-->
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>三条工務店 ビジネス適性診断</title>
+
+<!-- CDN: React 18 / Babel(ブラウザ内JSX変換) / Chart.js -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  /* ===== デザイントークン: ネイビー基調＋銅色アクセント ===== */
+  :root {
+    --navy: #16324f;
+    --navy-dark: #0e2438;
+    --navy-light: #2c5578;
+    --accent: #c07b3a;      /* 銅色アクセント */
+    --accent-soft: #f4e6d6;
+    --bg: #f5f7f9;
+    --card: #ffffff;
+    --text: #24313d;
+    --text-sub: #5a6b7a;
+    --line: #dde4ea;
+    --green: #2e7d5b;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN",
+                 "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    font-size: 16px;
+  }
+  #root { min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ===== 共通レイアウト ===== */
+  .app-header {
+    background: var(--navy);
+    color: #fff;
+    padding: 14px 20px;
+    text-align: center;
+  }
+  .app-header .brand { font-size: 13px; letter-spacing: 0.12em; opacity: 0.85; }
+  .app-header .title { font-size: 17px; font-weight: 700; }
+  .container {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 24px 16px 56px;
+    flex: 1;
+  }
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: 0 2px 12px rgba(22, 50, 79, 0.08);
+    padding: 28px 24px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 480px) { .card { padding: 22px 16px; } }
+
+  /* 画面切替アニメーション */
+  .screen { animation: fadeUp 0.35s ease both; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  h1 { font-size: 24px; color: var(--navy); line-height: 1.4; margin-bottom: 12px; }
+  h2 { font-size: 19px; color: var(--navy); margin-bottom: 10px; }
+  h3 { font-size: 16px; color: var(--navy); margin-bottom: 6px; }
+  p.sub { color: var(--text-sub); font-size: 14.5px; }
+
+  /* ===== ボタン ===== */
+  .btn {
+    display: inline-block;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 14px 28px;
+    min-height: 50px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 3px 10px rgba(192,123,58,0.35); }
+  .btn-primary:hover { box-shadow: 0 5px 16px rgba(192,123,58,0.45); }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+  .btn-ghost { background: transparent; color: var(--navy-light); border: 1.5px solid var(--line); }
+  .btn-ghost:hover { border-color: var(--navy-light); }
+  .btn-wide { width: 100%; }
+
+  /* ===== トップ画面 ===== */
+  .hero-badge {
+    display: inline-block;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 14px;
+    border-radius: 999px;
+    margin-bottom: 14px;
+  }
+  .info-list { list-style: none; margin: 18px 0; }
+  .info-list li {
+    padding: 10px 0 10px 30px;
+    position: relative;
+    border-bottom: 1px dashed var(--line);
+    font-size: 15px;
+  }
+  .info-list li::before {
+    content: "✓";
+    position: absolute; left: 4px;
+    color: var(--green); font-weight: 700;
+  }
+  .notice-box {
+    background: #fdf7ef;
+    border: 1px solid #ecd9bf;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 13.5px;
+    color: #6b5638;
+    margin: 16px 0 22px;
+  }
+
+  /* ===== タイプ選択画面 ===== */
+  .mode-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .mode-tab {
+    flex: 1;
+    font-family: inherit;
+    font-size: 14px; font-weight: 700;
+    padding: 12px 6px;
+    border-radius: 10px;
+    border: 1.5px solid var(--line);
+    background: #fff; color: var(--text-sub);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mode-tab.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+  .axis-block { margin-bottom: 18px; }
+  .axis-label { font-size: 13px; font-weight: 700; color: var(--text-sub); margin-bottom: 6px; }
+  .axis-pair { display: flex; gap: 10px; }
+  .axis-option {
+    flex: 1;
+    font-family: inherit;
+    text-align: left;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1.5px solid var(--line);
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .axis-option:hover { border-color: var(--navy-light); }
+  .axis-option.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .axis-option .letter { font-size: 18px; font-weight: 800; color: var(--navy); }
+  .axis-option .desc { font-size: 12.5px; color: var(--text-sub); line-height: 1.5; }
+
+  .type-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  @media (max-width: 560px) { .type-grid { grid-template-columns: repeat(2, 1fr); } }
+  .type-cell {
+    font-family: inherit;
+    padding: 12px 8px;
+    border-radius: 10px;
+    border: 1.5px solid var(--line);
+    background: #fff;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    min-height: 74px;
+  }
+  .type-cell:hover { border-color: var(--navy-light); transform: translateY(-2px); }
+  .type-cell.selected { border-color: var(--accent); background: var(--accent-soft); }
+  .type-cell .code { font-size: 17px; font-weight: 800; color: var(--navy); letter-spacing: 0.05em; }
+  .type-cell .name { font-size: 11.5px; color: var(--text-sub); line-height: 1.45; display: block; margin-top: 2px; }
+
+  .selected-type-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--navy); color: #fff;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-top: 20px;
+  }
+  .selected-type-bar .code { font-size: 22px; font-weight: 800; letter-spacing: 0.08em; }
+  .selected-type-bar .name { font-size: 13px; opacity: 0.85; }
+
+  /* ===== 質問画面 ===== */
+  .progress-wrap { margin-bottom: 22px; }
+  .progress-meta {
+    display: flex; justify-content: space-between;
+    font-size: 13px; color: var(--text-sub); font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .progress-track {
+    height: 8px; background: var(--line);
+    border-radius: 999px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--navy-light), var(--accent));
+    border-radius: 999px;
+    transition: width 0.3s ease;
+  }
+  .q-category {
+    display: inline-block;
+    font-size: 12px; font-weight: 700;
+    color: var(--navy-light);
+    background: #e8eef4;
+    padding: 3px 12px;
+    border-radius: 999px;
+    margin-bottom: 12px;
+  }
+  .q-text { font-size: 18px; font-weight: 700; line-height: 1.7; margin-bottom: 24px; min-height: 3.4em; }
+  @media (max-width: 480px) { .q-text { font-size: 16.5px; } }
+
+  .likert { display: flex; flex-direction: column; gap: 10px; }
+  .likert-option {
+    font-family: inherit;
+    display: flex; align-items: center; gap: 14px;
+    width: 100%;
+    padding: 13px 16px;
+    min-height: 52px;
+    border-radius: 10px;
+    border: 1.5px solid var(--line);
+    background: #fff;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+  }
+  .likert-option:hover { border-color: var(--navy-light); background: #f7fafc; }
+  .likert-option.selected { border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
+  .likert-option .num {
+    flex-shrink: 0;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--line); color: var(--text-sub);
+    font-weight: 800; font-size: 14px;
+  }
+  .likert-option.selected .num { background: var(--accent); color: #fff; }
+
+  .quiz-nav { display: flex; gap: 12px; margin-top: 24px; }
+  .quiz-nav .btn { flex: 1; }
+
+  /* ===== 結果画面 ===== */
+  .fit-gauge-wrap { text-align: center; padding: 8px 0 4px; }
+  .fit-score { font-size: 52px; font-weight: 800; color: var(--navy); line-height: 1.1; }
+  .fit-score small { font-size: 22px; color: var(--text-sub); font-weight: 700; }
+  .gauge-track {
+    height: 16px; background: var(--line);
+    border-radius: 999px; overflow: hidden;
+    margin: 14px 0 10px;
+  }
+  .gauge-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--navy-light), var(--accent));
+    border-radius: 999px;
+    transition: width 0.8s ease;
+  }
+  .chart-box { position: relative; width: 100%; max-width: 420px; margin: 0 auto; }
+  .dept-row {
+    padding: 13px 16px;
+    border-radius: 10px;
+    border: 1.5px solid var(--line);
+    margin-bottom: 10px;
+  }
+  .dept-row.best { border-color: var(--accent); background: var(--accent-soft); }
+  .dept-row .dept-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-bottom: 4px;
+  }
+  .dept-row .dept-name { font-weight: 800; color: var(--navy); font-size: 15px; }
+  .dept-row .dept-score { font-weight: 800; font-size: 19px; color: var(--accent); flex-shrink: 0; }
+  .dept-row .dept-comment { font-size: 13px; color: var(--text-sub); line-height: 1.6; }
+  .best-badge {
+    display: inline-block;
+    background: var(--accent); color: #fff;
+    font-size: 11px; font-weight: 700;
+    padding: 2px 10px; border-radius: 999px;
+    margin-left: 8px; vertical-align: 2px;
+  }
+  .profile-section { margin-bottom: 16px; }
+  .profile-section h3 { display: flex; align-items: center; gap: 8px; }
+  .profile-section ul { margin: 4px 0 0 22px; font-size: 14.5px; }
+  .profile-section li { margin-bottom: 3px; }
+
+  /* ===== 特性詳細（表・バッジ・強みチップ） ===== */
+  .strength-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 700;
+    padding: 6px 14px; border-radius: 999px;
+  }
+  .chip-strong { background: var(--accent-soft); color: var(--accent); border: 1px solid #e4c9a8; }
+  .chip-grow   { background: #e9f3ee; color: var(--green); border: 1px solid #c4dfd2; }
+
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    min-width: 480px;
+  }
+  .detail-table th {
+    text-align: left;
+    font-size: 12px;
+    color: var(--text-sub);
+    border-bottom: 2px solid var(--line);
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+  .detail-table td {
+    padding: 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+    line-height: 1.6;
+  }
+  .detail-table td.score-cell { font-weight: 800; color: var(--navy); white-space: nowrap; }
+  .band-badge {
+    display: inline-block;
+    font-size: 11.5px; font-weight: 700;
+    padding: 2px 10px; border-radius: 999px;
+    white-space: nowrap;
+  }
+  .band-strong { background: var(--accent-soft); color: var(--accent); }
+  .band-stable { background: #e8eef4; color: var(--navy-light); }
+  .band-grow   { background: #e9f3ee; color: var(--green); }
+
+  /* スマホでは表を横スクロールさせず、1行＝1カードの縦積みに切り替える */
+  @media (max-width: 560px) {
+    .detail-table { min-width: 0; }
+    .detail-table thead { display: none; }
+    .detail-table tbody tr {
+      display: block;
+      border: 1.5px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+    .detail-table td {
+      display: block;
+      border: none;
+      padding: 2px 0;
+    }
+  }
+
+  .mini-bar-track {
+    width: 90px; height: 7px;
+    background: var(--line); border-radius: 999px;
+    overflow: hidden; display: inline-block;
+    vertical-align: 2px; margin-left: 8px;
+  }
+  .mini-bar-fill { height: 100%; background: linear-gradient(90deg, var(--navy-light), var(--accent)); border-radius: 999px; }
+
+  .disclaimer {
+    background: #eef3f7;
+    border-left: 5px solid var(--navy);
+    border-radius: 8px;
+    padding: 16px 18px;
+    font-size: 13.5px;
+    color: var(--text);
+    line-height: 1.8;
+  }
+  .disclaimer strong { color: var(--navy); display: block; margin-bottom: 4px; }
+
+  .app-footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-sub);
+    padding: 16px;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ============================================================
+   ▼ 調整用定数（スコアの効き方を変えたいときはここ）
+   ============================================================ */
+const ANSWER_RATIO = 0.75;   // 部署スコアに占める「回答」の比率（残りはタイプ補正）
+const SCORE_FLOOR  = 40;     // スコア下限。素点0-100を FLOOR-100 に圧縮して底上げ
+
+/* ============================================================
+   ▼ カテゴリ定義（10カテゴリ）
+   ============================================================ */
+const CATEGORIES = {
+  stress:  "ストレス耐性・逆境対応",
+  nego:    "対人折衝・交渉力",
+  acc:     "正確性・緻密さ",
+  team:    "チームワーク・誠実性",
+  adapt:   "変化対応・段取り力",
+  drive:   "目標達成意欲・行動力",
+  create:  "創造性・デザイン感覚",
+  empathy: "傾聴・共感力",
+  plan:    "企画・分析・発信力",
+  learn:   "学習意欲・成長志向",
+};
+
+/* カルチャーフィット算出時のカテゴリ重み（合計1.0）
+   誠実性=team、現場/顧客対応の耐性=stress、変化対応=adapt、
+   若い成長企業ゆえ drive/learn も重視 */
+const CULTURE_WEIGHTS = {
+  team: 0.15, stress: 0.15, adapt: 0.12, drive: 0.12, learn: 0.12,
+  acc: 0.10, nego: 0.10, empathy: 0.07, create: 0.04, plan: 0.03,
+};
+
+/* 部署別適性のカテゴリ重み（三条工務店の実際の6部門。各行合計1.0）
+   営業部        = 仕入れ(買取)・販売・価格交渉・目標達成
+   工務部        = 工程管理・施工業者折衝・工期(=金利負担)厳守
+   空間デザイナー = リノベーションプラン作成・商品企画
+   財務経理・契約管理 = 金銭処理・契約書チェック・各部署支援
+   経営企画・人事・広報 = 会社の仕組みづくり・採用・発信
+   （株）雅家    = 事故物件・訳あり物件専門（グループ会社） */
+const DEPT_WEIGHTS = {
+  eigyo:  { drive: 0.30, nego: 0.25, stress: 0.20, empathy: 0.15, adapt: 0.10 },
+  koumu:  { adapt: 0.30, nego: 0.25, stress: 0.25, acc: 0.20 },
+  design: { create: 0.40, adapt: 0.15, empathy: 0.15, acc: 0.15, learn: 0.15 },
+  keiri:  { acc: 0.45, team: 0.30, plan: 0.15, stress: 0.10 },
+  kikaku: { plan: 0.35, team: 0.20, drive: 0.15, create: 0.15, learn: 0.15 },
+  miyabi: { empathy: 0.35, stress: 0.25, nego: 0.25, team: 0.15 },
+};
+
+const DEPT_INFO = {
+  eigyo:  { name: "営業部", short: "営業",
+    comment: "物件の仕入れ（買取）と販売が主戦場。仲介業者・売主との交渉と目標達成意欲が問われる最前線。" },
+  koumu:  { name: "工務部（商品コーディネーター）", short: "工務",
+    comment: "年間1,000件超の物件の工程管理と施工業者との折衝を担い、工期（＝金利負担）を守り抜く現場の司令塔。" },
+  design: { name: "空間デザイナー", short: "デザイナー",
+    comment: "買い取った中古物件のリノベーションプランを作成し、「売れる空間」を創造するデザイン職。" },
+  keiri:  { name: "財務経理・契約管理", short: "経理・契約",
+    comment: "買取契約の書類手続き、金銭処理、物件資料の作成で全部署を支えるバックオフィスの要。" },
+  kikaku: { name: "経営企画・人事・広報", short: "企画・人事",
+    comment: "急成長する組織の制度設計・採用・情報発信を担う「会社をつくる」ポジション。" },
+  miyabi: { name: "（株）雅家（特殊物件）", short: "雅家",
+    comment: "事故物件・訳あり物件専門のグループ会社。事情を抱えたお客様に寄り添う傾聴力と胆力が要る専門職。" },
+};
+
+/* ============================================================
+   ▼ 共通の基礎質問 60問（10カテゴリ×6問。逆転項目 rev:true は19問）
+   三条工務店の業務文脈（買取再販・工期・施工業者折衝・契約書類・
+   事故物件対応など）に沿った具体的な行動を問う。
+   ============================================================ */
+const COMMON_QUESTIONS = [
+  /* --- ①ストレス耐性・逆境対応 --- */
+  { text: "納期や工期が迫る状況でも、落ち着いて優先順位を整理できる", cat: "stress", rev: false },
+  { text: "顧客や取引先から厳しい指摘を受けると、しばらく仕事が手につかなくなる", cat: "stress", rev: true },
+  { text: "クレームやトラブルへの対応も、経験を積む機会として前向きに捉えられる", cat: "stress", rev: false },
+  { text: "想定外の出費やスケジュールの遅れが発生しても、感情的にならずに対処できる", cat: "stress", rev: false },
+  { text: "複数の関係者から同時に急ぎの依頼を受けると、頭が真っ白になりやすい", cat: "stress", rev: true },
+  { text: "うまくいかない日があっても、気持ちを切り替えて翌日の仕事に臨める", cat: "stress", rev: false },
+
+  /* --- ②対人折衝・交渉力 --- */
+  { text: "初対面の相手とも、要点を押さえて交渉や調整を進められる", cat: "nego", rev: false },
+  { text: "立場や利害の異なる相手と条件をすり合わせる場面は、できれば避けたい", cat: "nego", rev: true },
+  { text: "相手の要望を丁寧に聞き出し、双方が納得できる着地点を探るのが得意だ", cat: "nego", rev: false },
+  { text: "年上の職人や経験豊富な相手に対しても、必要なことをはっきり伝えられる", cat: "nego", rev: false },
+  { text: "価格や条件の交渉で、根拠を示しながら自分の主張を通した経験がある", cat: "nego", rev: false },
+  { text: "強く主張されると、内心納得していなくても相手に合わせてしまう", cat: "nego", rev: true },
+
+  /* --- ③正確性・緻密さ --- */
+  { text: "書類や数字の細かい誤りに、自然と目が行くほうだ", cat: "acc", rev: false },
+  { text: "作業のスピードを優先して、細部の確認を省略してしまうことがある", cat: "acc", rev: true },
+  { text: "決められた手順やルールを、最後まで正確に守り切ることができる", cat: "acc", rev: false },
+  { text: "契約書や重要書類は、隅々まで読んでから署名・処理するタイプだ", cat: "acc", rev: false },
+  { text: "金銭や数量の管理では、1円・1個単位のズレも放置したくない", cat: "acc", rev: false },
+  { text: "同じ作業を長く繰り返していると、集中力が落ちてミスが増えやすい", cat: "acc", rev: true },
+
+  /* --- ④チームワーク・誠実性 --- */
+  { text: "自分の担当外の仕事でも、チームが困っていれば進んで手を貸す", cat: "team", rev: false },
+  { text: "仕事は基本的に一人で完結させたく、他部署との連携は煩わしいと感じる", cat: "team", rev: true },
+  { text: "ミスや遅れが起きたとき、事実をありのまま関係者に報告・共有できる", cat: "team", rev: false },
+  { text: "約束した期日や報告のタイミングは、必ず守るようにしている", cat: "team", rev: false },
+  { text: "自分個人の成果よりも、チーム全体の成果を優先して動けるほうだ", cat: "team", rev: false },
+  { text: "忙しいとき、周囲への報告・連絡・相談が後回しになりがちだ", cat: "team", rev: true },
+
+  /* --- ⑤変化対応・段取り力 --- */
+  { text: "予定していた段取りが崩れても、すぐに代替案を組み直せる", cat: "adapt", rev: false },
+  { text: "複数の案件を並行して進めるとき、全体のスケジュールを俯瞰して管理できる", cat: "adapt", rev: false },
+  { text: "一度決めたやり方を途中で変えることには、強い抵抗を感じる", cat: "adapt", rev: true },
+  { text: "締切から逆算して、途中の工程に予備日を設けるのが習慣になっている", cat: "adapt", rev: false },
+  { text: "新しいツールや仕事の進め方を、抵抗なく取り入れられる", cat: "adapt", rev: false },
+  { text: "急な予定変更が続くと、仕事への意欲が大きく下がってしまう", cat: "adapt", rev: true },
+
+  /* --- ⑥目標達成意欲・行動力 --- */
+  { text: "数字の目標を与えられると、達成までの道筋を自分で考えて動ける", cat: "drive", rev: false },
+  { text: "目標に届かなかったとき、原因を分析して次の行動を変えられる", cat: "drive", rev: false },
+  { text: "高い目標に挑むより、確実にこなせる範囲の仕事のほうが好きだ", cat: "drive", rev: true },
+  { text: "迷ったときは、まず行動して結果から学ぶほうだ", cat: "drive", rev: false },
+  { text: "同期や同僚の活躍を聞くと、「自分も頑張ろう」と燃えるタイプだ", cat: "drive", rev: false },
+  { text: "成果が出るまで時間のかかる仕事は、途中でモチベーションが続かない", cat: "drive", rev: true },
+
+  /* --- ⑦創造性・デザイン感覚 --- */
+  { text: "部屋や空間のレイアウト・配色を考えるのが好きだ", cat: "create", rev: false },
+  { text: "街を歩くとき、建物の外観や内装のデザインに自然と目が行く", cat: "create", rev: false },
+  { text: "既存のやり方をなぞるより、自分なりの工夫やアイデアを加えたくなる", cat: "create", rev: false },
+  { text: "「センスがいいね」「発想が面白いね」と言われることがある", cat: "create", rev: false },
+  { text: "住まいやインテリアの流行・トレンドには、あまり興味が持てない", cat: "create", rev: true },
+  { text: "ゼロから何かを生み出すより、決められたものを正確に仕上げるほうが得意だ", cat: "create", rev: true },
+
+  /* --- ⑧傾聴・共感力 --- */
+  { text: "相手が話しやすいように、聞き役に回ることができる", cat: "empathy", rev: false },
+  { text: "相手の表情や声のトーンから、気持ちの変化に気づけるほうだ", cat: "empathy", rev: false },
+  { text: "事情を抱えた相手の話でも、先入観を持たずに最後まで聞ける", cat: "empathy", rev: false },
+  { text: "友人や同僚から、悩みや相談事を打ち明けられることが多い", cat: "empathy", rev: false },
+  { text: "相手の話が長いと、つい途中で結論を促してしまう", cat: "empathy", rev: true },
+  { text: "感情的になっている相手への対応は、正直かなり苦手だ", cat: "empathy", rev: true },
+
+  /* --- ⑨企画・分析・発信力 --- */
+  { text: "情報やデータを整理して、資料やレポートにまとめるのが得意だ", cat: "plan", rev: false },
+  { text: "物事の仕組みや制度を「もっと良くできないか」と考えるのが好きだ", cat: "plan", rev: false },
+  { text: "自分の考えを、文章や図にして人に分かりやすく伝えられる", cat: "plan", rev: false },
+  { text: "会社や組織全体の数字・動きに興味があるほうだ", cat: "plan", rev: false },
+  { text: "人前で発表したり、発信したりする役回りはできれば避けたい", cat: "plan", rev: true },
+  { text: "調べたり分析したりするより、体を動かす仕事のほうが性に合う", cat: "plan", rev: true },
+
+  /* --- ⑩学習意欲・成長志向 --- */
+  { text: "新しい知識や資格の勉強を、自分から進んで始めるほうだ", cat: "learn", rev: false },
+  { text: "指摘やフィードバックは、耳が痛くてもありがたいと感じる", cat: "learn", rev: false },
+  { text: "経験のない仕事を任されると、不安より楽しみのほうが大きい", cat: "learn", rev: false },
+  { text: "若いうちから責任ある仕事に挑戦したいという気持ちが強い", cat: "learn", rev: false },
+  { text: "慣れた仕事のやり方を変えてまで、新しいことを学ぶ必要は感じない", cat: "learn", rev: true },
+  { text: "分からないことがあると、まず自分で調べてから人に聞く", cat: "learn", rev: false },
+];
+
+/* ============================================================
+   ▼ タイプ別出し分け質問プール
+   MBTIの各文字ごとに2問を用意し、選択タイプの4文字 × 2問 = 8問を合成。
+   そのタイプが「苦手になりやすい領域」を確認する設計。
+   ============================================================ */
+const LETTER_QUESTIONS = {
+  E: [ // 外向型 → 単独での精緻作業・デスクワーク適性を確認
+    { text: "一人で黙々と書類チェックや数字の確認を行う作業にも、集中して取り組める", cat: "acc", rev: false },
+    { text: "静かな個人作業が長時間続くと、集中力が切れやすいと感じる", cat: "acc", rev: true },
+    { text: "チームで話し合いながら進める仕事のほうが、一人で進めるより成果を出しやすい", cat: "team", rev: false },
+    { text: "一日中デスクで資料を作り込む日が続くと、物足りなさを感じる", cat: "plan", rev: true },
+  ],
+  I: [ // 内向型 → 対外折衝・消耗度を確認
+    { text: "必要とあれば、自分から施工業者や顧客に連絡を取り、率直に交渉できる", cat: "nego", rev: false },
+    { text: "電話や対面でのやり取りが続く日は、普段より大きく消耗してしまう", cat: "stress", rev: true },
+    { text: "相手の懐に入る雑談やアイスブレイクは、正直得意ではない", cat: "nego", rev: true },
+    { text: "一人で集中して考える時間があると、仕事の質が上がるタイプだ", cat: "acc", rev: false },
+  ],
+  S: [ // 感覚型 → 前例のない状況・構想業務への対応を確認
+    { text: "現場や実務で得た具体的な情報をもとに、着実に判断を積み上げるのが得意だ", cat: "acc", rev: false },
+    { text: "前例のない状況では、方針が固まるまでなかなか動き出せない", cat: "adapt", rev: true },
+    { text: "図面や仕様書など、細かい情報を正確に読み取るのが得意だ", cat: "acc", rev: false },
+    { text: "「将来の構想を描く」仕事より「今日やるべきことを片付ける」仕事のほうが好きだ", cat: "plan", rev: true },
+  ],
+  N: [ // 直観型 → 実務への落とし込み・ルーチン遂行を確認
+    { text: "新しいアイデアを思いついたとき、実行に必要な手順やコストまで具体的に詰められる", cat: "adapt", rev: false },
+    { text: "毎日のルーチン作業は、つい後回しにしてしまいがちだ", cat: "acc", rev: true },
+    { text: "完成後の空間や暮らしのイメージを、頭の中で具体的に思い描ける", cat: "create", rev: false },
+    { text: "細かい書類仕事が続くと、うっかりミスが出やすい", cat: "acc", rev: true },
+  ],
+  T: [ // 思考型 → 対人配慮・共感面を確認
+    { text: "正しい指摘をするときも、相手の立場や感情に配慮した伝え方を選べる", cat: "team", rev: false },
+    { text: "結論を急ぐあまり、相手の気持ちの整理を待てないことがある", cat: "team", rev: true },
+    { text: "相手の頑張りや貢献を、意識して言葉にして伝えるほうだ", cat: "empathy", rev: false },
+    { text: "効率を優先しすぎて、周囲から「冷たい」と言われたことがある", cat: "empathy", rev: true },
+  ],
+  F: [ // 感情型 → 数値・論理に基づく判断を確認
+    { text: "相手に共感する場面でも、数字や契約条件に基づいて冷静に判断できる", cat: "acc", rev: false },
+    { text: "人間関係への影響を気にして、言うべき指摘を先送りすることがある", cat: "nego", rev: true },
+    { text: "感情に流されず、損益やリスクの数字をもとに判断を下せる", cat: "plan", rev: false },
+    { text: "断る場面や厳しい条件を伝える場面では、必要以上に胸が痛む", cat: "nego", rev: true },
+  ],
+  J: [ // 判断型 → 計画変更への柔軟性を確認
+    { text: "計画の変更を求められたとき、不満よりも先に修正案を考えられる", cat: "adapt", rev: false },
+    { text: "想定外の割り込み仕事が入ると、ペースを大きく乱されてしまう", cat: "stress", rev: true },
+    { text: "状況が流動的な案件でも、まず動きながら形にしていける", cat: "adapt", rev: false },
+    { text: "マニュアルや前例のない仕事には、着手までに時間がかかる", cat: "adapt", rev: true },
+  ],
+  P: [ // 知覚型 → 締切対応・段取りを確認
+    { text: "締切から逆算して、余裕を持った段取りを自分で組み立てられる", cat: "adapt", rev: false },
+    { text: "着手が遅れて、締切直前に慌てて仕上げることがよくある", cat: "acc", rev: true },
+    { text: "長期の案件でも、途中の締切を自分で設定して計画的に進められる", cat: "adapt", rev: false },
+    { text: "書類の提出期限や事務手続きを、うっかり忘れてしまうことがある", cat: "acc", rev: true },
+  ],
+};
+
+/* 選択タイプ("ESTJ"等) → 76問の質問リストを返す */
+function buildQuestions(type) {
+  const extra = type.split("").flatMap(letter => LETTER_QUESTIONS[letter]);
+  return [...COMMON_QUESTIONS, ...extra]; // 60 + 16 = 76問
+}
+
+/* ============================================================
+   ▼ タイプごとの部署補正（0-100の基礎相性。回答スコアと合成される）
+   ============================================================ */
+const TYPE_BONUS = {
+  ISTJ: { eigyo: 50, koumu: 70, design: 45, keiri: 85, kikaku: 60, miyabi: 55 },
+  ISFJ: { eigyo: 50, koumu: 60, design: 50, keiri: 85, kikaku: 55, miyabi: 70 },
+  INFJ: { eigyo: 55, koumu: 55, design: 65, keiri: 70, kikaku: 70, miyabi: 75 },
+  INTJ: { eigyo: 50, koumu: 80, design: 60, keiri: 70, kikaku: 80, miyabi: 50 },
+  ISTP: { eigyo: 50, koumu: 85, design: 55, keiri: 65, kikaku: 50, miyabi: 55 },
+  ISFP: { eigyo: 55, koumu: 60, design: 80, keiri: 65, kikaku: 45, miyabi: 70 },
+  INFP: { eigyo: 55, koumu: 50, design: 75, keiri: 60, kikaku: 60, miyabi: 75 },
+  INTP: { eigyo: 45, koumu: 65, design: 60, keiri: 75, kikaku: 75, miyabi: 50 },
+  ESTP: { eigyo: 85, koumu: 75, design: 50, keiri: 45, kikaku: 50, miyabi: 65 },
+  ESFP: { eigyo: 85, koumu: 55, design: 65, keiri: 45, kikaku: 50, miyabi: 70 },
+  ENFP: { eigyo: 80, koumu: 55, design: 75, keiri: 45, kikaku: 65, miyabi: 75 },
+  ENTP: { eigyo: 85, koumu: 65, design: 65, keiri: 45, kikaku: 75, miyabi: 60 },
+  ESTJ: { eigyo: 70, koumu: 85, design: 45, keiri: 65, kikaku: 70, miyabi: 55 },
+  ESFJ: { eigyo: 75, koumu: 60, design: 55, keiri: 70, kikaku: 60, miyabi: 80 },
+  ENFJ: { eigyo: 80, koumu: 60, design: 60, keiri: 55, kikaku: 75, miyabi: 80 },
+  ENTJ: { eigyo: 75, koumu: 80, design: 50, keiri: 55, kikaku: 85, miyabi: 55 },
+};
+
+/* ============================================================
+   ▼ タイプ解説（一言説明＋ビジネス上の強み/成長ポイント/チーム内役割）
+   すべてポジティブ・建設的な表現で記述する。
+   ============================================================ */
+const TYPE_PROFILES = {
+  ISTJ: { label: "堅実な管理者",
+    strengths: ["決めたことを最後までやり抜く責任感", "数字・書類の正確な処理", "ルールと期日を確実に守る信頼性"],
+    growth: ["急な計画変更にも柔軟に構えると強みがさらに活きる", "自分の考えを早めに言葉にすると連携が円滑に"],
+    role: "チームの土台を支える実務の要。安定した進行と正確さで周囲に安心感を与える。" },
+  ISFJ: { label: "献身的なサポーター",
+    strengths: ["細やかな気配りとサポート力", "コツコツ続ける粘り強さ", "頼まれたことを丁寧に仕上げる誠実さ"],
+    growth: ["抱え込む前に周囲へ相談すると負担が分散できる", "自分の成果も積極的に伝えると評価につながる"],
+    role: "縁の下でチームを支える調整役。困っている人に自然に手を差し伸べる存在。" },
+  INFJ: { label: "洞察力のある理想家",
+    strengths: ["相手の本音を汲み取る洞察力", "長期的な視点での計画性", "静かな粘り強さ"],
+    growth: ["完璧を目指しすぎず、まず形にして共有すると前進が早い", "考えを早めに開示すると協力を得やすい"],
+    role: "チームの方向性に深みを与える参謀役。メンバーの変化にいち早く気づく。" },
+  INTJ: { label: "戦略的な設計者",
+    strengths: ["全体を見通す戦略的思考", "工程やコストの構造的な把握", "独力で課題を解決する推進力"],
+    growth: ["結論に至った理由を丁寧に共有すると納得を得やすい", "現場の声を早めに取り込むと計画の精度が上がる"],
+    role: "複雑な案件の設計図を描く頭脳役。長期の段取りと改善提案で価値を発揮。" },
+  ISTP: { label: "現場対応の職人",
+    strengths: ["トラブル時の冷静な対処力", "実物・現場ベースの的確な判断", "手を動かして解決する実践力"],
+    growth: ["進捗や判断の共有をこまめにすると周囲が動きやすい", "定型業務も仕組み化すると強みに変わる"],
+    role: "現場で頼りにされる即応型のプレーヤー。突発事態でも慌てず対処できる。" },
+  ISFP: { label: "柔軟な実務家",
+    strengths: ["相手に合わせる柔軟さと温かさ", "五感を活かした品質へのこだわり", "押し付けのない自然な協調性"],
+    growth: ["意見を求められたら遠慮なく伝えると議論が深まる", "優先順位を先に決めると複数案件でも安定する"],
+    role: "チームの雰囲気を和らげる潤滑油。丁寧な仕事ぶりで信頼を積み重ねる。" },
+  INFP: { label: "誠実な理想追求者",
+    strengths: ["仕事の意義を大切にする誠実さ", "相手の気持ちに寄り添う共感力", "納得したことへの高い集中力"],
+    growth: ["完成度より締切を優先する場面を意識すると評価が安定する", "数字で語る習慣をつけると説得力が増す"],
+    role: "顧客やメンバーの想いを汲み取る良心役。価値観の合う仕事で大きな力を発揮。" },
+  INTP: { label: "分析型の問題解決者",
+    strengths: ["物事の仕組みを見抜く分析力", "客観的で偏りのない判断", "複雑な問題を整理する思考力"],
+    growth: ["分析結果を期限内にアウトプットする意識で強みが活きる", "結論を先に伝えると会話が噛み合いやすい"],
+    role: "データや契約の矛盾を見つける検証役。チームの意思決定に論理の裏付けを与える。" },
+  ESTP: { label: "行動力ある交渉人",
+    strengths: ["その場の状況を読む反射神経", "物怖じしない交渉力・行動力", "変化を楽しむフットワーク"],
+    growth: ["書類・数字の最終確認をルーチン化するとミスを防げる", "長期案件は節目ごとの振り返りが効果的"],
+    role: "商談や現場調整の最前線で動くムードメーカー。停滞した局面を動かす突破役。" },
+  ESFP: { label: "場を明るくする実践家",
+    strengths: ["誰とでも打ち解ける親しみやすさ", "顧客の反応を捉える観察力", "行動しながら学ぶ吸収力"],
+    growth: ["事務処理は先に片付ける習慣で信頼がさらに高まる", "長期計画は仲間と共有しながら進めると続けやすい"],
+    role: "顧客との距離を一気に縮める潤滑油。チームの士気を高めるエネルギー源。" },
+  ENFP: { label: "発想豊かな共感者",
+    strengths: ["新しい企画を生み出す発想力", "人を巻き込む熱意と共感力", "顧客の潜在ニーズを引き出す会話力"],
+    growth: ["着手した案件をやり切る仕組み（リスト化等）で成果が安定する", "細部の確認は仲間と分担すると効率的"],
+    role: "チームに新しい風を吹き込む起点役。人と人をつなぎ、可能性を広げる。" },
+  ENTP: { label: "機転の利く挑戦者",
+    strengths: ["制約の中で打ち手を見つける機転", "議論で本質を突く思考力", "新しい手法への挑戦意欲"],
+    growth: ["決まった方針をやり切る継続力が加わると無敵に近づく", "相手のペースに合わせる余裕が交渉の幅を広げる"],
+    role: "行き詰まった交渉や企画に突破口を開くアイデアマン。変化の局面で輝く。" },
+  ESTJ: { label: "頼れる現場監督",
+    strengths: ["工程・人・コストを仕切る管理能力", "決断の速さと実行力", "責任感に裏打ちされた統率力"],
+    growth: ["メンバーの事情に耳を傾ける余白があるとチームがさらに強くなる", "例外対応も選択肢として持つと幅が広がる"],
+    role: "計画を確実に前へ進める推進役。期日と品質を守る現場のリーダー。" },
+  ESFJ: { label: "気配りの調整役",
+    strengths: ["チーム全体への細やかな気配り", "顧客に安心感を与える対応力", "約束を守る堅実さ"],
+    growth: ["全員の要望に応えようとしすぎず優先順位をつけると楽になる", "変化はチャンスと捉えると強みが広がる"],
+    role: "部署間の橋渡しを担う調整役。顧客・仲間の信頼を集める会社の顔。" },
+  ENFJ: { label: "人を動かすまとめ役",
+    strengths: ["メンバーの強みを引き出す指導力", "場の空気を作るコミュニケーション力", "目標に向けて人を束ねる力"],
+    growth: ["自分自身の負荷にも目を向けると長く力を発揮できる", "厳しい判断も先送りしないと信頼が深まる"],
+    role: "チームの結束を高めるまとめ役。顧客との長期的な関係構築でも力を発揮。" },
+  ENTJ: { label: "目標達成のリーダー",
+    strengths: ["目標から逆算する計画力と推進力", "数字への強いコミットメント", "困難な交渉をまとめる胆力"],
+    growth: ["メンバーの歩幅に合わせる場面を作るとチーム全体が加速する", "プロセスへのねぎらいが人を動かす"],
+    role: "高い目標を掲げてチームを牽引する推進役。事業を伸ばす原動力。" },
+};
+
+/* ============================================================
+   ▼ カテゴリ別の詳細コメント（3段階。すべて建設的な表現で記述）
+   strong: スコア75以上 / stable: 60〜74 / grow: 60未満
+   ============================================================ */
+const CATEGORY_COMMENTS = {
+  stress: {
+    strong: "プレッシャーのかかる場面でも安定して力を発揮できるタイプです。工期対応やクレーム対応でも頼りにされそうです。",
+    stable: "多くの場面で落ち着いて対応できます。負荷が続くときは周囲との分担を意識するとさらに安定します。",
+    grow:   "物事を丁寧に受け止める感受性の表れです。安心して相談できる環境で、持ち味を発揮しやすくなります。",
+  },
+  nego: {
+    strong: "利害の異なる相手との調整力が強みです。施工業者との折衝や価格交渉での活躍が期待できます。",
+    stable: "相手に応じた折衝ができています。場数を重ねることで交渉の引き出しがさらに増えていきます。",
+    grow:   "聞き役としての丁寧さが持ち味です。信頼関係を土台にじっくり進める折衝スタイルが向いています。",
+  },
+  acc: {
+    strong: "数字や書類を正確に扱う力が際立っています。契約書チェックや金銭管理で強みを発揮できます。",
+    stable: "実務に必要な正確さを備えています。確認のチェックリスト化で、さらに安定感が増します。",
+    grow:   "細部より全体を大きく捉える視点の表れです。ダブルチェックの仕組みと組み合わせると効果的です。",
+  },
+  team: {
+    strong: "誠実な報告・連携の姿勢はチームの信頼の土台になります。部署間連携の要として活躍できそうです。",
+    stable: "協調性と自立性のバランスが取れています。役割分担が明確な環境で力を発揮しやすいタイプです。",
+    grow:   "自分のペースで深く取り組む集中型です。個人の裁量が大きい業務との相性が良いでしょう。",
+  },
+  adapt: {
+    strong: "段取り力と頭の切り替えの速さが強みです。工程管理や複数案件の並行処理に向いています。",
+    stable: "計画性と柔軟性を状況に応じて使い分けられます。経験とともに段取りの精度が上がっていきます。",
+    grow:   "一つのことを着実に進める堅実さの表れです。定型度の高い業務で安定した力を発揮できます。",
+  },
+  drive: {
+    strong: "目標に向かって自走できる推進力が際立っています。仕入れ・販売の数字を追う環境で輝けそうです。",
+    stable: "目標達成への意欲を安定して持てています。成功体験を重ねることでさらに加速していくタイプです。",
+    grow:   "着実さを大切にする姿勢の表れです。プロセスが明確な業務で、コツコツと成果を積み上げられます。",
+  },
+  create: {
+    strong: "空間やデザインへの感度が高く、発想力が強みです。リノベーションの企画・デザインで活躍が期待できます。",
+    stable: "実務とアイデアのバランスが取れています。良い事例に多く触れることで感性がさらに磨かれます。",
+    grow:   "決められたものを正確に形にする実直さの表れです。仕組みが整った業務との相性が良いでしょう。",
+  },
+  empathy: {
+    strong: "相手の気持ちを汲み取る力が際立っています。事情を抱えたお客様への対応や社内調整で信頼を集めそうです。",
+    stable: "場面に応じて聞き役に回れるバランス型です。経験とともに対応の引き出しが増えていきます。",
+    grow:   "論理や事実を大切にする姿勢の表れです。数字や根拠で語る業務で持ち味を発揮できます。",
+  },
+  plan: {
+    strong: "情報を構造化して伝える力が強みです。経営企画・人事・広報など「会社をつくる」仕事に向いています。",
+    stable: "分析と実行のバランスが取れています。資料づくりや改善提案の経験を重ねると強みに育ちます。",
+    grow:   "考えるより動くフットワークの表れです。現場での実践を通じて学ぶスタイルが合っています。",
+  },
+  learn: {
+    strong: "旺盛な学習意欲と挑戦心が際立っています。若手に大きな裁量を任せる社風との相性が抜群です。",
+    stable: "必要な学びを着実に積み重ねられるタイプです。目標が明確なほど成長速度が上がります。",
+    grow:   "今できることを確実にやり切る堅実さの表れです。習熟を深める働き方で安定感を発揮します。",
+  },
+};
+
+/* カテゴリスコア(下限補正後) → 3段階の帯域 */
+function catBand(score) {
+  if (score >= 75) return { key: "strong", label: "強み",     cls: "band-strong" };
+  if (score >= 60) return { key: "stable", label: "安定",     cls: "band-stable" };
+  return               { key: "grow",   label: "伸びしろ", cls: "band-grow" };
+}
+
+/* ============================================================
+   ▼ 回答スタイル分析（生の回答値から算出。面接での対話の参考情報）
+   ============================================================ */
+const ANSWER_STYLE_METRICS = [
+  {
+    name: "自己評価の傾向",
+    desc: "回答全体の平均値",
+    calc: (ans) => ans.reduce((a, b) => a + b, 0) / ans.length,
+    format: (v) => v.toFixed(1) + " / 5.0",
+    judge: (v) => v >= 3.8
+      ? "自分の強みを前向きに捉えるタイプ。面接では具体的なエピソードを聞くと人物像が立体的になります。"
+      : v >= 3.0
+      ? "バランスの取れた自己認識です。強み・課題の両面を客観的に語れる可能性が高いでしょう。"
+      : "謙虚で慎重な自己評価のタイプ。実際の力は自己申告より高いことが多く、実績ベースの質問が有効です。",
+  },
+  {
+    name: "回答のメリハリ",
+    desc: "回答値のばらつき（標準偏差）",
+    calc: (ans) => {
+      const m = ans.reduce((a, b) => a + b, 0) / ans.length;
+      return Math.sqrt(ans.reduce((a, b) => a + (b - m) ** 2, 0) / ans.length);
+    },
+    format: (v) => v.toFixed(2),
+    judge: (v) => v >= 1.1
+      ? "質問ごとに明確に判断を分けており、自己分析がはっきりしているタイプです。"
+      : v >= 0.6
+      ? "適度なメリハリのある回答スタイルです。得意・不得意の自己認識が概ね整理されています。"
+      : "回答が一定の範囲に集まっています。得意分野を面接で深掘りすると、より特徴が見えてきます。",
+  },
+  {
+    name: "判断の明確さ",
+    desc: "「どちらともいえない」を選んだ割合",
+    calc: (ans) => (ans.filter(a => a === 3).length / ans.length) * 100,
+    format: (v) => Math.round(v) + " %",
+    judge: (v) => v < 20
+      ? "自己認識が明確で、自分の得意・不得意をはっきり把握しているタイプです。"
+      : v < 40
+      ? "場面によって慎重に判断するタイプです。迷った項目を面接で聞くと対話が深まります。"
+      : "熟考しながら回答したことがうかがえます。ご本人の言葉で補足してもらうと理解が深まります。",
+  },
+];
+
+/* 4軸セレクター用の説明 */
+const AXES = [
+  { key: 0, name: "エネルギーの向き", options: [
+    { letter: "E", desc: "人と関わって energized。外向型" },
+    { letter: "I", desc: "一人の時間で充電。内向型" } ] },
+  { key: 1, name: "ものの見方", options: [
+    { letter: "S", desc: "事実・経験を重視。感覚型" },
+    { letter: "N", desc: "直観・可能性を重視。直観型" } ] },
+  { key: 2, name: "判断のしかた", options: [
+    { letter: "T", desc: "論理・筋道で判断。思考型" },
+    { letter: "F", desc: "気持ち・調和で判断。感情型" } ] },
+  { key: 3, name: "外界への接し方", options: [
+    { letter: "J", desc: "計画的に進めたい。判断型" },
+    { letter: "P", desc: "柔軟に対応したい。知覚型" } ] },
+];
+
+const ALL_TYPES = Object.keys(TYPE_PROFILES);
+
+const DISCLAIMER_TEXT = "本診断は応募者ご自身の自己理解と、面接での対話のきっかけづくりを目的とした参考情報です。MBTIおよび本診断の結果は、採用の合否や特定部署への配属を決定するものではありません。性格タイプに優劣はなく、結果によって不利益な取り扱いを受けることはありません。回答内容はこのブラウザ内でのみ処理され、どこにも送信・保存されません。";
+
+/* ============================================================
+   ▼ スコアリングロジック
+   ============================================================ */
+
+/* 素点0-100を SCORE_FLOOR-100 に圧縮（極端な低スコアを出さない） */
+function applyFloor(score) {
+  return Math.round(SCORE_FLOOR + (score / 100) * (100 - SCORE_FLOOR));
+}
+
+/* カテゴリごとの正規化スコア(0-100)を算出。逆転項目は 6-回答値 で反転 */
+function calcCategoryScores(questions, answers) {
+  const sum = {}, max = {};
+  questions.forEach((q, i) => {
+    const raw = q.rev ? 6 - answers[i] : answers[i];
+    sum[q.cat] = (sum[q.cat] || 0) + (raw - 1); // 1-5 → 0-4 に変換して正規化
+    max[q.cat] = (max[q.cat] || 0) + 4;
+  });
+  const scores = {};
+  Object.keys(CATEGORIES).forEach(cat => {
+    scores[cat] = max[cat] ? (sum[cat] / max[cat]) * 100 : 50;
+  });
+  return scores;
+}
+
+/* 部署別スコア = 回答(ANSWER_RATIO) + タイプ補正(1-ANSWER_RATIO) → 下限底上げ */
+function calcDeptScores(catScores, type) {
+  const result = {};
+  Object.keys(DEPT_WEIGHTS).forEach(dept => {
+    const w = DEPT_WEIGHTS[dept];
+    let answerScore = 0;
+    Object.keys(w).forEach(cat => { answerScore += catScores[cat] * w[cat]; });
+    const mixed = answerScore * ANSWER_RATIO + TYPE_BONUS[type][dept] * (1 - ANSWER_RATIO);
+    result[dept] = applyFloor(mixed);
+  });
+  return result;
+}
+
+/* カルチャーフィット度 = カテゴリスコアの重み付き平均 → 下限底上げ */
+function calcCultureFit(catScores) {
+  let total = 0;
+  Object.keys(CULTURE_WEIGHTS).forEach(cat => {
+    total += catScores[cat] * CULTURE_WEIGHTS[cat];
+  });
+  return applyFloor(total);
+}
+
+function fitComment(score) {
+  if (score >= 80) return "三条工務店が大切にする「誠実さ・チーム連携・お客様対応」との親和性がとても高い結果です。あなたの持ち味を、面接でぜひ具体的なエピソードとともにお聞かせください。";
+  if (score >= 65) return "当社のカルチャーと良い相性が期待できる結果です。特にスコアの高かった側面は、入社後すぐに活きる強みになりそうです。";
+  return "あなたならではの持ち味が見える結果です。スコアはあくまで現時点の自己認識であり、環境や経験で大きく変わります。面接では、あなたが力を発揮しやすい場面について一緒にお話しできれば幸いです。";
+}
+
+function deptComment(dept, score, isBest) {
+  const base = {
+    eigyo: score >= 70
+      ? "目標達成意欲と折衝力のバランスが良く、仕入れ（買取）から販売まで顧客と向き合う最前線での活躍が期待できます。"
+      : "お客様と信頼関係を築きながら、じっくり営業力を伸ばしていける素地があります。",
+    koumu: score >= 70
+      ? "段取り力とストレス耐性が高く、工程管理や施工業者との折衝で力を発揮できそうです。"
+      : "経験を積むことで、工期を守り抜く工程管理の面白さを実感していけるポテンシャルがあります。",
+    design: score >= 70
+      ? "創造性と空間への感度が高く、中古物件に新しい価値を吹き込むデザインで活躍できそうです。"
+      : "数多くの実物件に触れながら、デザインの引き出しを増やしていける環境が合っています。",
+    keiri: score >= 70
+      ? "正確性と誠実な連携姿勢が強みです。契約書チェックや金銭処理で頼れる存在になれそうです。"
+      : "丁寧に取り組む姿勢を活かし、実務経験とともに正確性を磨いていけるでしょう。",
+    kikaku: score >= 70
+      ? "分析・発信力と全体を見る視点があり、急成長する組織の仕組みづくりで力を発揮できそうです。"
+      : "現場経験を重ねることで、会社づくりへの視点を育てていけるポテンシャルがあります。",
+    miyabi: score >= 70
+      ? "傾聴力と胆力を併せ持ち、事情を抱えたお客様に寄り添う特殊物件のプロフェッショナルに向いています。"
+      : "相手に誠実に向き合う姿勢を土台に、難易度の高い案件への対応力を磨いていけます。",
+  };
+  return (isBest ? "【最も適性が高い部署】" : "") + base[dept];
+}
+
+/* ============================================================
+   ▼ UIコンポーネント
+   ============================================================ */
+
+/* --- 画面1: トップ --- */
+function TopScreen({ onStart }) {
+  return (
+    <div className="screen">
+      <div className="card">
+        <span className="hero-badge">採用選考 参考ツール</span>
+        <h1>ビジネス版MBTI適性診断</h1>
+        <p className="sub">
+          ご自身のMBTIタイプと、仕事に関する76の質問への回答から、
+          三条工務店とのカルチャーフィット度と、6つの部門
+          （営業・工務・空間デザイナー・財務経理/契約管理・経営企画/人事/広報・雅家）
+          への適性傾向を診断します。
+        </p>
+        <ul className="info-list">
+          <li>所要時間の目安：約25〜30分</li>
+          <li>MBTIタイプの選択 ＋ ビジネス特化質問76問（5段階評価）</li>
+          <li>全6部門への適性をレーダーチャートで表示</li>
+          <li>結果はその場ですぐに表示されます</li>
+        </ul>
+        <div className="notice-box">
+          <strong>はじめにお読みください：</strong>
+          本診断は合否を決めるものではなく、ご自身の理解と面接での対話のきっかけづくりのための
+          <b>参考情報</b>です。正直に、直感でお答えいただくのが最も有意義な結果につながります。
+          回答はこのブラウザ内でのみ処理され、どこにも送信・保存されません。
+        </div>
+        <button className="btn btn-primary btn-wide" onClick={onStart}>
+          診断をはじめる
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* --- 画面2: MBTIタイプ選択 --- */
+function TypeSelectScreen({ onDecide }) {
+  const [mode, setMode] = useState("axis");            // "axis" | "grid"
+  const [axisPicks, setAxisPicks] = useState([null, null, null, null]);
+  const [gridPick, setGridPick] = useState(null);
+
+  const axisType = axisPicks.every(p => p) ? axisPicks.join("") : null;
+  const selected = mode === "axis" ? axisType : gridPick;
+
+  return (
+    <div className="screen">
+      <div className="card">
+        <h2>あなたのMBTIタイプを選んでください</h2>
+        <p className="sub">タイプが分かる方は「16タイプから選ぶ」、分からない方は「4つの軸から選ぶ」をご利用ください。</p>
+
+        <div className="mode-tabs" role="tablist" style={{marginTop: 16}}>
+          <button role="tab" aria-selected={mode === "axis"}
+            className={"mode-tab" + (mode === "axis" ? " active" : "")}
+            onClick={() => setMode("axis")}>4つの軸から選ぶ</button>
+          <button role="tab" aria-selected={mode === "grid"}
+            className={"mode-tab" + (mode === "grid" ? " active" : "")}
+            onClick={() => setMode("grid")}>16タイプから選ぶ</button>
+        </div>
+
+        {mode === "axis" && (
+          <div>
+            {AXES.map((axis, idx) => (
+              <div className="axis-block" key={axis.name}>
+                <div className="axis-label">{idx + 1}. {axis.name}</div>
+                <div className="axis-pair">
+                  {axis.options.map(opt => (
+                    <button key={opt.letter}
+                      className={"axis-option" + (axisPicks[idx] === opt.letter ? " selected" : "")}
+                      aria-pressed={axisPicks[idx] === opt.letter}
+                      onClick={() => {
+                        const next = [...axisPicks];
+                        next[idx] = opt.letter;
+                        setAxisPicks(next);
+                      }}>
+                      <span className="letter">{opt.letter}</span>
+                      <span className="desc"> — {opt.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {mode === "grid" && (
+          <div className="type-grid" role="listbox" aria-label="16タイプ一覧">
+            {ALL_TYPES.map(t => (
+              <button key={t} role="option" aria-selected={gridPick === t}
+                className={"type-cell" + (gridPick === t ? " selected" : "")}
+                onClick={() => setGridPick(t)}>
+                <span className="code">{t}</span>
+                <span className="name">{TYPE_PROFILES[t].label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {selected && (
+          <div className="selected-type-bar">
+            <div>
+              <div className="code">{selected}</div>
+              <div className="name">{TYPE_PROFILES[selected].label}</div>
+            </div>
+            <button className="btn btn-primary" onClick={() => onDecide(selected)}>
+              このタイプで進む
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* --- 画面3: ビジネス特化質問（1問ずつ表示） --- */
+const LIKERT_LABELS = [
+  "全くあてはまらない", "あまりあてはまらない", "どちらともいえない",
+  "ややあてはまる", "非常にあてはまる",
+];
+
+function QuizScreen({ questions, answers, setAnswers, onFinish }) {
+  const [idx, setIdx] = useState(0);
+  const total = questions.length;
+  const q = questions[idx];
+  const answered = answers.filter(a => a !== null).length;
+  const allDone = answered === total;
+  const isLast = idx === total - 1;
+
+  const select = (value) => {
+    const next = [...answers];
+    next[idx] = value;
+    setAnswers(next);
+    if (!isLast) setTimeout(() => setIdx(i => Math.min(i + 1, total - 1)), 180);
+  };
+
+  return (
+    <div className="screen">
+      <div className="card">
+        <div className="progress-wrap">
+          <div className="progress-meta">
+            <span>質問 {idx + 1} / {total}</span>
+            <span>回答済み {answered} / {total}</span>
+          </div>
+          <div className="progress-track" role="progressbar"
+            aria-valuenow={answered} aria-valuemin={0} aria-valuemax={total}>
+            <div className="progress-fill" style={{ width: `${(answered / total) * 100}%` }} />
+          </div>
+        </div>
+
+        <span className="q-category">{CATEGORIES[q.cat]}</span>
+        <p className="q-text">Q{idx + 1}. {q.text}</p>
+
+        <div className="likert" role="radiogroup" aria-label="回答を選択">
+          {LIKERT_LABELS.map((label, i) => {
+            const value = i + 1;
+            const sel = answers[idx] === value;
+            return (
+              <button key={value} role="radio" aria-checked={sel}
+                className={"likert-option" + (sel ? " selected" : "")}
+                onClick={() => select(value)}>
+                <span className="num">{value}</span>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="quiz-nav">
+          <button className="btn btn-ghost" disabled={idx === 0}
+            onClick={() => setIdx(i => i - 1)}>← 前へ</button>
+          {isLast ? (
+            <button className="btn btn-primary" disabled={!allDone} onClick={onFinish}>
+              結果を見る
+            </button>
+          ) : (
+            <button className="btn btn-ghost" disabled={answers[idx] === null}
+              onClick={() => setIdx(i => i + 1)}>次へ →</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* --- 結果画面のレーダーチャート（Chart.js） --- */
+function DeptRadarChart({ deptScores }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const deptKeys = Object.keys(DEPT_WEIGHTS);
+    const chart = new Chart(canvasRef.current, {
+      type: "radar",
+      data: {
+        labels: deptKeys.map(k => DEPT_INFO[k].short),
+        datasets: [{
+          label: "部署別適性スコア",
+          data: deptKeys.map(k => deptScores[k]),
+          backgroundColor: "rgba(192, 123, 58, 0.22)",
+          borderColor: "#c07b3a",
+          borderWidth: 2.5,
+          pointBackgroundColor: "#16324f",
+          pointRadius: 5,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+          r: {
+            min: 0, max: 100,
+            ticks: { stepSize: 20, backdropColor: "transparent", color: "#5a6b7a" },
+            grid: { color: "#dde4ea" },
+            angleLines: { color: "#dde4ea" },
+            pointLabels: { font: { size: 12, weight: "700" }, color: "#16324f" },
+          },
+        },
+        plugins: { legend: { display: false } },
+      },
+    });
+    return () => chart.destroy();
+  }, [deptScores]);
+  return (
+    <div className="chart-box">
+      <canvas ref={canvasRef} aria-label="部署別適性のレーダーチャート" role="img"></canvas>
+    </div>
+  );
+}
+
+/* --- 結果画面のカテゴリ別横棒グラフ（Chart.js） --- */
+function CategoryBarChart({ catDisplay }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const keys = Object.keys(CATEGORIES);
+    const chart = new Chart(canvasRef.current, {
+      type: "bar",
+      data: {
+        labels: keys.map(k => CATEGORIES[k]),
+        datasets: [{
+          label: "カテゴリスコア",
+          data: keys.map(k => catDisplay[k]),
+          backgroundColor: keys.map(k =>
+            catDisplay[k] >= 75 ? "rgba(192,123,58,0.85)" :
+            catDisplay[k] >= 60 ? "rgba(44,85,120,0.8)" : "rgba(46,125,91,0.75)"),
+          borderRadius: 6,
+          barThickness: 18,
+        }],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { min: 0, max: 100, ticks: { stepSize: 20, color: "#5a6b7a" }, grid: { color: "#dde4ea" } },
+          y: { ticks: { font: { size: 12.5, weight: "700" }, color: "#16324f" }, grid: { display: false } },
+        },
+        plugins: { legend: { display: false } },
+      },
+    });
+    return () => chart.destroy();
+  }, [catDisplay]);
+  return (
+    <div style={{ height: 420 }}>
+      <canvas ref={canvasRef} aria-label="カテゴリ別スコアの横棒グラフ" role="img"></canvas>
+    </div>
+  );
+}
+
+/* --- 画面4: 結果 --- */
+function ResultScreen({ type, questions, answers, onRestart }) {
+  const catScores = calcCategoryScores(questions, answers);
+  const deptScores = calcDeptScores(catScores, type);
+  const cultureFit = calcCultureFit(catScores);
+  const profile = TYPE_PROFILES[type];
+  const bestDept = Object.keys(deptScores)
+    .reduce((a, b) => (deptScores[b] > deptScores[a] ? b : a));
+  const deptOrder = Object.keys(DEPT_WEIGHTS);
+
+  /* カテゴリ別の表示用スコア（部署スコアと同じく下限底上げを適用） */
+  const catDisplay = {};
+  Object.keys(CATEGORIES).forEach(k => { catDisplay[k] = applyFloor(catScores[k]); });
+  /* スコア降順に並べたカテゴリ（表・強みチップ用） */
+  const rankedCats = Object.keys(CATEGORIES)
+    .sort((a, b) => catDisplay[b] - catDisplay[a]);
+  const topCats = rankedCats.slice(0, 2);
+  const growCat = rankedCats[rankedCats.length - 1];
+
+  return (
+    <div className="screen">
+      {/* (a) カルチャーフィット度 */}
+      <div className="card">
+        <h2>診断結果 — {type}（{profile.label}）</h2>
+        <div className="fit-gauge-wrap">
+          <p className="sub" style={{fontWeight: 700}}>三条工務店とのカルチャーフィット度</p>
+          <div className="fit-score">{cultureFit}<small> %</small></div>
+          <div className="gauge-track" role="progressbar"
+            aria-valuenow={cultureFit} aria-valuemin={0} aria-valuemax={100}
+            aria-label="カルチャーフィット度">
+            <div className="gauge-fill" style={{ width: `${cultureFit}%` }} />
+          </div>
+        </div>
+        <p className="sub">{fitComment(cultureFit)}</p>
+      </div>
+
+      {/* (b) 部署別適性 */}
+      <div className="card">
+        <h2>部署別適性</h2>
+        <DeptRadarChart deptScores={deptScores} />
+        <div style={{marginTop: 18}}>
+          {deptOrder.map(dept => (
+            <div key={dept} className={"dept-row" + (dept === bestDept ? " best" : "")}>
+              <div className="dept-head">
+                <span className="dept-name">
+                  {DEPT_INFO[dept].name}
+                  {dept === bestDept && <span className="best-badge">BEST</span>}
+                </span>
+                <span className="dept-score">{deptScores[dept]}<small style={{fontSize: 12}}> /100</small></span>
+              </div>
+              <p className="dept-comment">
+                {deptComment(dept, deptScores[dept], dept === bestDept)} {DEPT_INFO[dept].comment}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* (b-2) カテゴリ別の特性詳細（横棒グラフ＋表） */}
+      <div className="card">
+        <h2>特性の詳細分析</h2>
+        <p className="sub">76問の回答を10のビジネス特性に分解したスコアです。</p>
+        <div className="strength-chips" aria-label="強みと伸びしろのサマリー">
+          {topCats.map(k => (
+            <span key={k} className="chip chip-strong">💪 強み：{CATEGORIES[k]}</span>
+          ))}
+          <span className="chip chip-grow">🌱 伸びしろ：{CATEGORIES[growCat]}</span>
+        </div>
+        <CategoryBarChart catDisplay={catDisplay} />
+        <div className="table-scroll">
+          <table className="detail-table">
+            <thead>
+              <tr>
+                <th scope="col">特性カテゴリ</th>
+                <th scope="col">スコア</th>
+                <th scope="col">評価</th>
+                <th scope="col">ワンポイント</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rankedCats.map(k => {
+                const band = catBand(catDisplay[k]);
+                return (
+                  <tr key={k}>
+                    <td style={{fontWeight: 700, color: "var(--navy)", whiteSpace: "nowrap"}}>{CATEGORIES[k]}</td>
+                    <td className="score-cell">
+                      {catDisplay[k]}
+                      <span className="mini-bar-track" aria-hidden="true">
+                        <span className="mini-bar-fill" style={{width: `${catDisplay[k]}%`, display: "block"}} />
+                      </span>
+                    </td>
+                    <td><span className={"band-badge " + band.cls}>{band.label}</span></td>
+                    <td>{CATEGORY_COMMENTS[k][band.key]}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* (b-3) 回答スタイル分析（面接での対話の参考情報） */}
+      <div className="card">
+        <h2>回答スタイルの傾向</h2>
+        <p className="sub">スコアとは別に、回答のしかたそのものから見える傾向です。優劣ではなく、面接での対話のヒントとしてご覧ください。</p>
+        <div className="table-scroll" style={{marginTop: 10}}>
+          <table className="detail-table">
+            <thead>
+              <tr>
+                <th scope="col">指標</th>
+                <th scope="col">値</th>
+                <th scope="col">読み取れる傾向</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ANSWER_STYLE_METRICS.map(m => {
+                const v = m.calc(answers);
+                return (
+                  <tr key={m.name}>
+                    <td style={{fontWeight: 700, color: "var(--navy)", whiteSpace: "nowrap"}}>
+                      {m.name}
+                      <span style={{display: "block", fontSize: 11, fontWeight: 400, color: "var(--text-sub)"}}>{m.desc}</span>
+                    </td>
+                    <td className="score-cell">{m.format(v)}</td>
+                    <td>{m.judge(v)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* (c) タイプ解説 */}
+      <div className="card">
+        <h2>{type}（{profile.label}）のビジネス傾向</h2>
+        <div className="profile-section">
+          <h3>💪 仕事上の強み</h3>
+          <ul>{profile.strengths.map(s => <li key={s}>{s}</li>)}</ul>
+        </div>
+        <div className="profile-section">
+          <h3>🌱 さらに伸ばせるポイント</h3>
+          <ul>{profile.growth.map(s => <li key={s}>{s}</li>)}</ul>
+        </div>
+        <div className="profile-section">
+          <h3>🤝 チーム内での役割傾向</h3>
+          <p style={{fontSize: "14.5px"}}>{profile.role}</p>
+        </div>
+      </div>
+
+      {/* (d) 免責事項 */}
+      <div className="card">
+        <div className="disclaimer">
+          <strong>ご確認ください（免責事項）</strong>
+          {DISCLAIMER_TEXT}
+        </div>
+      </div>
+
+      {/* (e) 再診断 */}
+      <button className="btn btn-ghost btn-wide" onClick={onRestart}>
+        もう一度診断する
+      </button>
+    </div>
+  );
+}
+
+/* --- ルート: 4画面をuseStateで切り替えるSPA --- */
+function App() {
+  const [screen, setScreen] = useState("top");   // top | type | quiz | result
+  const [mbtiType, setMbtiType] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [answers, setAnswers] = useState([]);
+
+  const startQuiz = (type) => {
+    const qs = buildQuestions(type);
+    setMbtiType(type);
+    setQuestions(qs);
+    setAnswers(Array(qs.length).fill(null));
+    setScreen("quiz");
+  };
+
+  const restart = () => {
+    setMbtiType(null);
+    setQuestions([]);
+    setAnswers([]);
+    setScreen("top");
+  };
+
+  return (
+    <React.Fragment>
+      <header className="app-header">
+        <div className="brand">SANJO KOMUTEN</div>
+        <div className="title">株式会社三条工務店 ビジネス適性診断</div>
+      </header>
+      <main className="container">
+        {screen === "top" && <TopScreen onStart={() => setScreen("type")} />}
+        {screen === "type" && <TypeSelectScreen onDecide={startQuiz} />}
+        {screen === "quiz" && (
+          <QuizScreen questions={questions} answers={answers}
+            setAnswers={setAnswers} onFinish={() => setScreen("result")} />
+        )}
+        {screen === "result" && (
+          <ResultScreen type={mbtiType} questions={questions}
+            answers={answers} onRestart={restart} />
+        )}
+      </main>
+      <footer className="app-footer">
+        © 株式会社三条工務店 — 本診断の回答はどこにも送信・保存されません
+      </footer>
+    </React.Fragment>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
