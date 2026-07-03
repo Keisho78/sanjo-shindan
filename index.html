@@ -289,6 +289,16 @@
 
   .quiz-nav { display: flex; gap: 12px; margin-top: 24px; }
   .quiz-nav .btn { flex: 1; }
+  .unanswered-note {
+    margin-top: 16px;
+    background: #fdf7ef;
+    border: 1px solid #ecd9bf;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 13.5px;
+    color: #6b5638;
+    line-height: 1.7;
+  }
 
   /* ===== 結果画面 ===== */
   .fit-gauge-wrap { text-align: center; padding: 8px 0 4px; }
@@ -1059,12 +1069,16 @@ function QuizScreen({ questions, answers, setAnswers, onFinish }) {
   const allDone = answered === total;
   const isLast = idx === total - 1;
 
+  /* 自動送りは「現在の質問の次」へ絶対値で移動する。
+     素早い連打でタイマーが2重発火しても同じ質問に着地し、質問飛ばしを防ぐ */
   const select = (value) => {
     const next = [...answers];
     next[idx] = value;
     setAnswers(next);
-    if (!isLast) setTimeout(() => setIdx(i => Math.min(i + 1, total - 1)), 180);
+    if (!isLast) setTimeout(() => setIdx(Math.min(idx + 1, total - 1)), 180);
   };
+
+  const firstUnanswered = answers.indexOf(null);
 
   return (
     <div className="screen">
@@ -1110,6 +1124,17 @@ function QuizScreen({ questions, answers, setAnswers, onFinish }) {
               onClick={() => setIdx(i => i + 1)}>次へ →</button>
           )}
         </div>
+
+        {/* 未回答が残っていると「結果を見る」が押せないため、該当質問へ誘導する */}
+        {isLast && !allDone && (
+          <div className="unanswered-note" role="alert">
+            未回答の質問が {total - answered} 問あります。すべて回答すると「結果を見る」が押せるようになります。
+            <button className="btn btn-primary btn-wide" style={{marginTop: 10}}
+              onClick={() => setIdx(firstUnanswered)}>
+              未回答の質問（Q{firstUnanswered + 1}）へ移動する
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
