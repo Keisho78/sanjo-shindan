@@ -27,7 +27,8 @@
     6. タイプ解説文: TYPE_PROFILES
     7. カテゴリ別の詳細コメント(強み/安定/伸びしろの3段階): CATEGORY_COMMENTS
     8. 回答スタイル分析の判定しきい値・文言: ANSWER_STYLE_METRICS
-    9. タイプ別キャラクター(名前・コピー・ドット絵): TYPE_CHARACTERS
+    9. 結果キャラクター(名前・コピー・ドット絵・特性プロファイル): CHARACTERS
+       ※MBTI固定ではなく、回答のカテゴリスコアとtraitsのマッチ度で選定(pickCharacter)
        ※ドット絵は12x12のテキストグリッド。「.」=透明、文字=paletteの色
 
   ■ 動作確認手順
@@ -216,9 +217,8 @@
     cursor: pointer;
     text-align: center;
     transition: all 0.15s;
-    min-height: 118px;
+    min-height: 74px;
   }
-  .type-cell svg { margin-bottom: 4px; }
   .type-cell:hover { border-color: var(--navy-light); transform: translateY(-2px); }
   .type-cell.selected { border-color: var(--accent); background: var(--accent-soft); }
   .type-cell .code { font-size: 17px; font-weight: 800; color: var(--navy); letter-spacing: 0.05em; }
@@ -329,6 +329,15 @@
     margin-bottom: 10px;
   }
   .char-copy { font-size: 14px; color: var(--text-sub); line-height: 1.8; }
+  .char-basis {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--navy-light);
+    background: #e8eef4;
+    padding: 5px 14px;
+    border-radius: 999px;
+  }
 
   /* ===== 結果画面 ===== */
   .fit-gauge-wrap { text-align: center; padding: 8px 0 4px; }
@@ -773,12 +782,15 @@ const TYPE_PROFILES = {
 };
 
 /* ============================================================
-   ▼ タイプ別キャラクター（名前・キャッチコピー・ドット絵）
+   ▼ 結果キャラクター（名前・キャッチコピー・ドット絵・特性プロファイル）
+   MBTIタイプ固定ではなく、回答から算出した10カテゴリのスコアと
+   各キャラの traits（特性プロファイル）のマッチ度が最も高いキャラを選定する。
+   traits: { カテゴリ: 重み } — 重みの合計は1.0にする。
    grid: 12x12のドット絵。「.」は透明、他の文字は palette の色に対応。
-   ドット絵を差し替えたい場合は grid と palette を編集する。
    ============================================================ */
-const TYPE_CHARACTERS = {
-  ISTJ: {
+const CHARACTERS = {
+  kame: {
+    traits: { acc: 0.50, team: 0.30, stress: 0.20 },
     name: "守りの鉄壁・カメ金庫番",
     copy: "締切・契約・1円のズレも見逃さない。ゆっくり見えて、誰よりも確実にゴールする堅実派。",
     palette: { D: "#3f7a3a", G: "#69a35e", W: "#ffffff", B: "#222222", M: "#2f4f2f" },
@@ -797,7 +809,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  ISFJ: {
+  pochi: {
+    traits: { team: 0.45, empathy: 0.35, acc: 0.20 },
     name: "忠実サポート犬・ポチ主任",
     copy: "困っている人を放っておけない。頼まれごとは絶対に忘れない、縁の下の世話役。",
     palette: { E: "#a5652f", T: "#d9a05b", W: "#ffffff", B: "#222222", N: "#5b3a1e", R: "#c0392b" },
@@ -816,7 +829,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  INFJ: {
+  fukurou: {
+    traits: { empathy: 0.40, plan: 0.35, team: 0.25 },
     name: "森の賢者・フクロウ和尚",
     copy: "静かに本質を見抜く洞察の人。チームの心の動きにいち早く気づく精神的支柱。",
     palette: { F: "#8d6e4b", L: "#e9d8b2", W: "#ffffff", B: "#222222", Y: "#e8a13c" },
@@ -835,7 +849,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  INTJ: {
+  kuroneko: {
+    traits: { plan: 0.45, acc: 0.30, adapt: 0.25 },
     name: "影の軍師・クロネコ参謀",
     copy: "常に3手先を読む静かな戦略家。工程もコストも、まず頭の中に設計図を描く。",
     palette: { K: "#3a3a4a", E: "#f5d76e", B: "#222222", P: "#e08a8a" },
@@ -854,7 +869,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  ISTP: {
+  beaver: {
+    traits: { adapt: 0.35, acc: 0.35, stress: 0.30 },
     name: "現場の匠・ビーバー棟梁",
     copy: "道具と現場をこよなく愛する職人肌。トラブルほど腕が鳴る、寡黙な問題解決人。",
     palette: { Y: "#f1c40f", N: "#8a5a33", M: "#c98d5a", W: "#ffffff", B: "#222222" },
@@ -873,7 +889,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  ISFP: {
+  usagi: {
+    traits: { create: 0.50, empathy: 0.30, acc: 0.20 },
     name: "感性の画伯・アトリエうさぎ",
     copy: "心地よい空間づくりの名人。声は小さいが、こだわりは誰よりも大きいアーティスト。",
     palette: { W: "#f8f8f4", P: "#f4b8c4", R: "#e74c3c", B: "#222222" },
@@ -892,7 +909,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  INFP: {
+  hitsuji: {
+    traits: { empathy: 0.45, create: 0.35, learn: 0.20 },
     name: "夢見る詩人・ふわふわ羊",
     copy: "想いを何より大切にする理想家。共感力で、家に「物語」を吹き込むタイプ。",
     palette: { C: "#f3efe6", F: "#caa27e", B: "#222222", P: "#f4b8c4" },
@@ -911,7 +929,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  INTP: {
+  penguin: {
+    traits: { plan: 0.40, acc: 0.40, learn: 0.20 },
     name: "理屈の探究者・ペンギン博士",
     copy: "口ぐせは「なぜ？」。データと論理で矛盾を見つけ出す、歩く検算マシン。",
     palette: { K: "#2c3e50", W: "#ffffff", G: "#555555", B: "#222222", Y: "#e8a13c" },
@@ -930,7 +949,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  ESTP: {
+  hayabusa: {
+    traits: { drive: 0.40, nego: 0.35, stress: 0.25 },
     name: "稲妻ハンター・ハヤブサ営業",
     copy: "考えるより先に体が動く。商機の匂いを100km先から嗅ぎつける狩人。",
     palette: { S: "#7d97ad", W: "#ffffff", B: "#222222", Y: "#e8a13c", R: "#c0392b" },
@@ -949,7 +969,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  ESFP: {
+  inko: {
+    traits: { empathy: 0.40, nego: 0.30, create: 0.30 },
     name: "太陽の座長・ごきげんインコ",
     copy: "いるだけで場が明るくなる天性のエンターテイナー。お客様の心を一瞬でつかむ。",
     palette: { G: "#7bc74d", K: "#333333", O: "#e8912d", Y: "#f7d154" },
@@ -968,7 +989,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  ENFP: {
+  risu: {
+    traits: { create: 0.40, learn: 0.30, drive: 0.30 },
     name: "ひらめき花火師・アイデアリス",
     copy: "頭の中はアイデアの貯蔵庫。思いつきに人を巻き込む、企画の火付け役。",
     palette: { N: "#c77b3f", M: "#e8ab6f", B: "#222222", P: "#e08a8a" },
@@ -987,7 +1009,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  ENTP: {
+  kitsune: {
+    traits: { nego: 0.35, plan: 0.35, create: 0.30 },
     name: "切り返しの発明王・キツネ軍略家",
     copy: "議論と新手法が大好物。「その手があったか」を毎週生み出す知恵者。",
     palette: { O: "#e67e22", W: "#ffffff", K: "#333333", B: "#222222", R: "#c0392b" },
@@ -1006,7 +1029,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  ESTJ: {
+  gorilla: {
+    traits: { adapt: 0.40, drive: 0.30, nego: 0.30 },
     name: "鉄の段取り・ゴリラ現場監督",
     copy: "工期は絶対。人もスケジュールも束ねて、決めたことは必ずやり切る統率者。",
     palette: { Y: "#f1c40f", D: "#4a4a52", M: "#8f8f98", B: "#222222" },
@@ -1025,7 +1049,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  ESFJ: {
+  panda: {
+    traits: { team: 0.40, empathy: 0.40, nego: 0.20 },
     name: "おもてなし支配人・きくばりパンダ",
     copy: "全方位に気配りの達人。社内外の「ありがとう」を一身に集める調整役。",
     palette: { K: "#2b2b2b", W: "#ffffff", B: "#000000", R: "#c0392b" },
@@ -1044,7 +1069,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  ENFJ: {
+  kuma: {
+    traits: { drive: 0.35, empathy: 0.35, team: 0.30 },
     name: "みんなの応援団長・コーチ熊",
     copy: "人の成長が自分の喜び。チームを一つにまとめる、頼れる兄貴・姉御肌。",
     palette: { C: "#3b6ea5", N: "#a86f3e", M: "#d8ab77", B: "#222222" },
@@ -1063,7 +1089,8 @@ const TYPE_CHARACTERS = {
       "............",
     ],
   },
-  ENTJ: {
+  lion: {
+    traits: { drive: 0.40, plan: 0.30, nego: 0.30 },
     name: "野望の王・ライオン社長候補",
     copy: "目標は大きいほど燃える。数字と組織を牽引する、生まれながらのリーダー。",
     palette: { M: "#c46a1b", Y: "#f7d154", F: "#e8b04b", B: "#222222", K: "#5b3a1e" },
@@ -1083,6 +1110,28 @@ const TYPE_CHARACTERS = {
     ],
   },
 };
+
+/* 回答から算出したカテゴリスコアに最もマッチするキャラクターを選定する。
+   マッチ度 = Σ(キャラのtraits重み × 応募者のカテゴリスコア)。
+   スコアが高いカテゴリの組み合わせがそのままキャラ選定に反映される。 */
+function pickCharacter(catScores) {
+  let bestKey = null, bestScore = -1;
+  Object.keys(CHARACTERS).forEach(key => {
+    const traits = CHARACTERS[key].traits;
+    let s = 0;
+    Object.keys(traits).forEach(cat => { s += catScores[cat] * traits[cat]; });
+    if (s > bestScore) { bestScore = s; bestKey = key; }
+  });
+  return { key: bestKey, ...CHARACTERS[bestKey] };
+}
+
+/* キャラ選定の根拠として表示する、traitsの重み上位2カテゴリ名 */
+function characterBasis(chara) {
+  return Object.keys(chara.traits)
+    .sort((a, b) => chara.traits[b] - chara.traits[a])
+    .slice(0, 2)
+    .map(cat => CATEGORIES[cat]);
+}
 
 /* ============================================================
    ▼ カテゴリ別の詳細コメント（3段階。すべて建設的な表現で記述）
@@ -1293,7 +1342,7 @@ function deptComment(dept, score, isBest) {
    ▼ UIコンポーネント
    ============================================================ */
 
-/* --- ドット絵スプライト描画（TYPE_CHARACTERSのgrid+paletteをSVGで描画） --- */
+/* --- ドット絵スプライト描画（CHARACTERSのgrid+paletteをSVGで描画） --- */
 function PixelSprite({ grid, palette, size }) {
   const rects = [];
   grid.forEach((row, y) => {
@@ -1328,7 +1377,7 @@ function TopScreen({ onStart }) {
           <li>所要時間の目安：約25〜30分</li>
           <li>MBTIタイプの選択 ＋ ビジネス特化質問76問（5段階評価）</li>
           <li>全7部門への適性をレーダーチャートで表示</li>
-          <li>あなたのタイプをあらわす「キャラクター」も判明します</li>
+          <li>回答内容から「あなたのビジネスキャラクター」を判定します</li>
           <li>結果はその場ですぐに表示されます</li>
         </ul>
         <div className="notice-box">
@@ -1400,7 +1449,6 @@ function TypeSelectScreen({ onDecide }) {
               <button key={t} role="option" aria-selected={gridPick === t}
                 className={"type-cell" + (gridPick === t ? " selected" : "")}
                 onClick={() => setGridPick(t)}>
-                <PixelSprite grid={TYPE_CHARACTERS[t].grid} palette={TYPE_CHARACTERS[t].palette} size={44} />
                 <span className="code">{t}</span>
                 <span className="name">{TYPE_PROFILES[t].label}</span>
               </button>
@@ -1410,12 +1458,9 @@ function TypeSelectScreen({ onDecide }) {
 
         {selected && (
           <div className="selected-type-bar">
-            <div style={{display: "flex", alignItems: "center", gap: 14}}>
-              <PixelSprite grid={TYPE_CHARACTERS[selected].grid} palette={TYPE_CHARACTERS[selected].palette} size={48} />
-              <div>
-                <div className="code">{selected}</div>
-                <div className="name">{TYPE_PROFILES[selected].label}</div>
-              </div>
+            <div>
+              <div className="code">{selected}</div>
+              <div className="name">{TYPE_PROFILES[selected].label}</div>
             </div>
             <button className="btn btn-primary" onClick={() => onDecide(selected)}>
               このタイプで進む
@@ -1612,18 +1657,24 @@ function ResultScreen({ type, questions, answers, onRestart }) {
     .sort((a, b) => catDisplay[b] - catDisplay[a]);
   const topCats = rankedCats.slice(0, 2);
   const growCat = rankedCats[rankedCats.length - 1];
+  /* 回答スコアに最もマッチするキャラクターを選定 */
+  const chara = pickCharacter(catScores);
 
   return (
     <div className="screen">
-      {/* (a) キャラクター＆カルチャーフィット度 */}
+      {/* (a) キャラクター＆カルチャーフィット度
+           キャラは回答から算出したカテゴリスコアとのマッチ度で選定（MBTI固定ではない） */}
       <div className="card">
         <h2>診断結果</h2>
         <div className="char-hero">
-          <PixelSprite grid={TYPE_CHARACTERS[type].grid} palette={TYPE_CHARACTERS[type].palette} size={132} />
-          <div className="char-lead">あなたは…</div>
-          <div className="char-name">『{TYPE_CHARACTERS[type].name}』</div>
-          <div className="char-type-badge">{type}（{profile.label}）タイプ</div>
-          <p className="char-copy">{TYPE_CHARACTERS[type].copy}</p>
+          <PixelSprite grid={chara.grid} palette={chara.palette} size={132} />
+          <div className="char-lead">あなたの回答から見えたのは…</div>
+          <div className="char-name">『{chara.name}』</div>
+          <div className="char-type-badge">{type}（{profile.label}）</div>
+          <p className="char-copy">{chara.copy}</p>
+          <p className="char-basis">
+            選定根拠：回答から「{characterBasis(chara)[0]}」と「{characterBasis(chara)[1]}」の傾向が特に強く表れています
+          </p>
         </div>
         <div className="fit-gauge-wrap">
           <p className="sub" style={{fontWeight: 700}}>三条工務店とのカルチャーフィット度</p>
