@@ -196,46 +196,159 @@
   .btn-ghost:hover { background: var(--cream); }
   .btn-wide { width: 100%; }
 
-  /* ===== トップ画面: 丘と空のイラストステージ ===== */
-  .hero-sprites {
+  /* ===== トップ画面: フルワイドのイラストヒーロー ===== */
+  .hero-scene {
     position: relative;
-    display: flex; justify-content: center; align-items: flex-end;
-    gap: 18px;
-    padding: 30px 12px 40px;
-    margin-bottom: 22px;
     border: 2px solid var(--ink);
-    border-radius: 20px;
+    border-radius: var(--radius);
     overflow: hidden;
-    /* やわらかい空と雲 */
-    background:
-      radial-gradient(26px 15px at 21% 26%, #ffffff 98%, transparent),
-      radial-gradient(36px 18px at 27% 30%, #ffffff 98%, transparent),
-      radial-gradient(22px 13px at 76% 16%, #ffffff 98%, transparent),
-      radial-gradient(32px 16px at 82% 21%, #ffffff 98%, transparent),
-      linear-gradient(var(--sky), #c3daee);
+    margin-bottom: 34px;
   }
-  .hero-sprites::after {
-    content: "";
-    position: absolute; left: 0; right: 0; bottom: 0;
-    height: 34px;
-    /* ふたつの丘 */
-    background:
-      radial-gradient(58% 150% at 20% 115%, var(--hill-3) 59%, transparent 60%),
-      radial-gradient(64% 160% at 82% 118%, var(--hill-2) 60%, transparent 61%),
-      var(--hill-1);
+  .hero-scene svg { display: block; width: 100%; height: auto; }
+  .hero-scene .bob { animation: floaty 3.6s ease-in-out infinite; }
+  .hero-title {
+    position: absolute;
+    top: 22px; left: 0; right: 0;
+    text-align: center;
+    pointer-events: none;
   }
-  .hero-sprite {
-    position: relative; z-index: 1;
-    margin-bottom: 18px;
-    animation: floaty 3.4s ease-in-out infinite;
+  .hero-catch {
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 12.5px;
+    letter-spacing: 0.22em;
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+  .hero-title h1 {
+    font-size: 34px;
+    letter-spacing: 0.14em;
+    margin-bottom: 0;
+  }
+  @media (max-width: 560px) {
+    /* 低い画面ではシーンの左右をトリミングして高さを確保する */
+    .hero-scene svg { height: 240px; }
+    .hero-title { top: 14px; }
+    .hero-title h1 { font-size: 22px; }
+    .hero-catch { font-size: 10.5px; letter-spacing: 0.12em; }
   }
   @keyframes floaty {
     0%, 100% { transform: translateY(0); }
     50%      { transform: translateY(-6px); }
   }
-  @media (max-width: 480px) {
-    .hero-sprites { gap: 8px; }
-    .hero-sprite:nth-child(6) { display: none; }
+
+  /* ===== セクション見出し（英字＋日本語＋波線。カードの外に置く） ===== */
+  .section-title {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding: 0 4px 12px;
+    margin-bottom: 18px;
+    background: var(--wavy) bottom left / 24px 10px repeat-x;
+  }
+  .section-title .en {
+    font-family: var(--font-en);
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: 0.18em;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  .section-title .ja {
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    color: var(--text-sub);
+  }
+  @media (max-width: 480px) { .section-title .en { font-size: 21px; } }
+  .result-sec { margin-bottom: 42px; }
+  .result-sec .card { margin-bottom: 0; }
+
+  /* ===== サイドバー＆縦書きキャッチ（広い画面のみ表示） ===== */
+  .sidebar, .side-catch { display: none; }
+  @media (min-width: 1160px) {
+    .app-header { display: none; }
+    .container { padding-top: 52px; }
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      left: 0; top: 0; bottom: 0;
+      width: 216px;
+      padding: 44px 30px 32px;
+      z-index: 10;
+    }
+    .sidebar-logo .en {
+      display: block;
+      font-family: var(--font-en);
+      font-weight: 800;
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      color: var(--green-deep);
+    }
+    .sidebar-logo strong {
+      display: block;
+      font-family: var(--font-head);
+      font-weight: 900;
+      font-size: 25px;
+      letter-spacing: 0.1em;
+      color: var(--ink);
+      line-height: 1.35;
+    }
+    .sidebar-logo .sub {
+      display: inline-block;
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      color: var(--text-sub);
+      padding-bottom: 10px;
+      background: var(--wavy) bottom left / 24px 10px repeat-x;
+    }
+    .side-steps {
+      list-style: none;
+      margin-top: 36px;
+    }
+    .side-steps li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 13.5px;
+      letter-spacing: 0.08em;
+      color: var(--text-sub);
+      padding: 8px 14px;
+      border: 2px solid transparent;
+      border-radius: 999px;
+      margin-bottom: 6px;
+    }
+    .side-steps li .num {
+      font-family: var(--font-en);
+      font-weight: 800;
+      font-size: 11px;
+      color: var(--green-deep);
+    }
+    .side-steps li.current {
+      background: var(--yellow);
+      border-color: var(--ink);
+      color: var(--ink);
+    }
+    .side-steps li.current .num { color: var(--ink); }
+    .sidebar-mascot { margin-top: auto; }
+    .side-catch {
+      display: block;
+      position: fixed;
+      right: 30px; top: 46px;
+      writing-mode: vertical-rl;
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.32em;
+      color: var(--ink);
+      z-index: 10;
+    }
   }
   .hero-badge {
     display: inline-block;
@@ -728,7 +841,8 @@
     body { background: #fff; font-size: 13px; }
     .card { border: 2px solid #333; break-inside: avoid; margin-bottom: 14px; }
     .screen > *, .char-frame { animation: none !important; }
-    .result-actions, .quiz-nav, .ground-sprites { display: none !important; }
+    .result-actions, .quiz-nav, .ground-sprites,
+    .sidebar, .side-catch { display: none !important; }
     .ground-scene { background: none; padding: 8px; }
     .ground-scene .copyright { color: #555; }
   }
@@ -1984,21 +2098,138 @@ function FitGauge({ score }) {
   );
 }
 
+/* --- セクション見出し（英字＋日本語＋波線。カードの外に置く） --- */
+function SectionTitle({ en, ja }) {
+  return (
+    <div className="section-title">
+      <span className="en">{en}</span>
+      <span className="ja">{ja}</span>
+    </div>
+  );
+}
+
+/* --- 左固定サイドバー（ロゴ＋診断ステップ。広い画面のみ表示） --- */
+function Sidebar({ screen }) {
+  const steps = [
+    { key: "top", label: "はじめに" },
+    { key: "type", label: "タイプ選択" },
+    { key: "quiz", label: "質問に回答" },
+    { key: "result", label: "診断結果" },
+  ];
+  return (
+    <aside className="sidebar">
+      <div className="sidebar-logo">
+        <span className="en">SANJO KOMUTEN</span>
+        <strong>三条工務店</strong>
+        <span className="sub">ビジネス適性診断</span>
+      </div>
+      <ol className="side-steps" aria-label="診断のながれ">
+        {steps.map((s, i) => (
+          <li key={s.key} className={screen === s.key ? "current" : ""}>
+            <span className="num">{String(i + 1).padStart(2, "0")}</span>
+            {s.label}
+          </li>
+        ))}
+      </ol>
+      <div className="sidebar-mascot" aria-hidden="true">
+        <CharaSprite chara="kame" size={64} />
+      </div>
+    </aside>
+  );
+}
+
+/* --- トップのヒーローシーン（太陽・雲・鳥・風車・家・木・丘に立つキャラたち） --- */
+function HeroScene() {
+  return (
+    <div className="hero-scene" aria-hidden="true">
+      <svg viewBox="0 0 720 300" preserveAspectRatio="xMidYMax slice"
+        strokeLinejoin="round" strokeLinecap="round">
+        <defs>
+          <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#8fb8de" />
+            <stop offset="100%" stopColor="#cfe4f4" />
+          </linearGradient>
+        </defs>
+        <rect width="720" height="300" fill="url(#skyGrad)" />
+
+        {/* 太陽（放射の短線つき） */}
+        <g stroke="#e0716a" strokeWidth="3">
+          <circle cx="630" cy="56" r="18" fill="#e0716a" stroke="none" />
+          <line x1="630" y1="24" x2="630" y2="14" /><line x1="630" y1="88" x2="630" y2="98" />
+          <line x1="598" y1="56" x2="588" y2="56" /><line x1="662" y1="56" x2="672" y2="56" />
+          <line x1="607" y1="33" x2="600" y2="26" /><line x1="653" y1="79" x2="660" y2="86" />
+          <line x1="653" y1="33" x2="660" y2="26" /><line x1="607" y1="79" x2="600" y2="86" />
+        </g>
+
+        {/* 雲 */}
+        <g fill="#ffffff">
+          <ellipse cx="110" cy="58" rx="34" ry="14" />
+          <ellipse cx="140" cy="48" rx="24" ry="12" />
+          <ellipse cx="400" cy="42" rx="30" ry="12" />
+          <ellipse cx="428" cy="34" rx="20" ry="10" />
+          <ellipse cx="530" cy="96" rx="26" ry="11" />
+        </g>
+
+        {/* 鳥 */}
+        <g fill="none" stroke={OL} strokeWidth="2.4">
+          <path d="M235 78 q8 -9 16 0 M251 78 q8 -9 16 0" />
+          <path d="M300 58 q7 -8 14 0 M314 58 q7 -8 14 0" />
+        </g>
+
+        {/* 風車 */}
+        <g transform="translate(556 128)">
+          <rect x="-3.5" y="0" width="7" height="80" rx="3.5" fill="#fbfaf5" stroke={OL} strokeWidth="2.6" />
+          <g fill="#fbfaf5" stroke={OL} strokeWidth="2.6">
+            <ellipse cx="0" cy="-24" rx="5" ry="24" />
+            <ellipse cx="0" cy="-24" rx="5" ry="24" transform="rotate(120)" />
+            <ellipse cx="0" cy="-24" rx="5" ry="24" transform="rotate(240)" />
+          </g>
+          <circle cx="0" cy="0" r="5" fill={OL} />
+        </g>
+
+        {/* 丘（奥→手前） */}
+        <path d="M0 208 Q170 152 350 196 T720 188 L720 300 L0 300 Z" fill="#c4e0b2" />
+        <path d="M0 246 Q220 198 460 238 T720 228 L720 300 L0 300 Z" fill="#a9d199" />
+        <path d="M0 290 Q240 246 500 276 T720 268 L720 300 L0 300 Z" fill="#8cc07e" />
+
+        {/* 家 */}
+        <g transform="translate(80 168)">
+          <rect x="0" y="22" width="64" height="42" rx="4" fill="#e0716a" stroke={OL} strokeWidth="2.6" />
+          <path d="M-8 24 L32 -6 L72 24 Z" fill="#d95f52" stroke={OL} strokeWidth="2.6" />
+          <rect x="10" y="34" width="14" height="12" rx="3" fill="#fbfaf5" stroke={OL} strokeWidth="2.2" />
+          <rect x="40" y="34" width="14" height="30" rx="3" fill="#fbfaf5" stroke={OL} strokeWidth="2.2" />
+        </g>
+
+        {/* 木 */}
+        <g stroke={OL} strokeWidth="2.4">
+          <rect x="196" y="206" width="7" height="16" fill="#a97c50" />
+          <circle cx="199" cy="196" r="17" fill="#6faf6f" />
+          <rect x="666" y="240" width="7" height="16" fill="#a97c50" />
+          <circle cx="669" cy="230" r="17" fill="#6faf6f" />
+        </g>
+
+        {/* 丘に立つキャラクターたち */}
+        <g transform="translate(238 196) scale(0.52)"><g className="bob">{CHARA_ART.gorilla}</g></g>
+        <g transform="translate(330 214) scale(0.48)" ><g className="bob" style={{animationDelay: "0.5s"}}>{CHARA_ART.pochi}</g></g>
+        <g transform="translate(406 200) scale(0.52)"><g className="bob" style={{animationDelay: "1s"}}>{CHARA_ART.usagi}</g></g>
+        <g transform="translate(548 214) scale(0.5)"><g className="bob" style={{animationDelay: "1.5s"}}>{CHARA_ART.panda}</g></g>
+        <g transform="translate(628 224) scale(0.46)"><g className="bob" style={{animationDelay: "2s"}}>{CHARA_ART.kuroneko}</g></g>
+      </svg>
+      <div className="hero-title">
+        <p className="hero-catch">三条工務店の採用選考でつかう 参考ツール</p>
+        <h1>ビジネス適性診断</h1>
+      </div>
+    </div>
+  );
+}
+
 /* --- 画面1: トップ --- */
 function TopScreen({ onStart, savedProgress, onResume }) {
-  const teaser = ["gorilla", "kuroneko", "usagi", "hayabusa", "panda", "fukurou"];
   return (
     <div className="screen">
+      <HeroScene />
+      <SectionTitle en="ABOUT" ja="この診断について" />
       <div className="card">
-        <div className="hero-sprites" aria-hidden="true">
-          {teaser.map((k, i) => (
-            <div className="hero-sprite" key={k} style={{ animationDelay: `${i * 0.4}s` }}>
-              <CharaSprite chara={k} size={56} />
-            </div>
-          ))}
-        </div>
-        <span className="hero-badge">採用選考 参考ツール</span>
-        <h1>ビジネス版MBTI適性診断</h1>
         <p className="sub">
           ご自身のMBTIタイプと、仕事に関する76の質問への回答から、
           三条工務店とのカルチャーフィット度と、7つの部門
@@ -2043,8 +2274,8 @@ function TypeSelectScreen({ onDecide }) {
 
   return (
     <div className="screen">
+      <SectionTitle en="SELECT" ja="あなたのMBTIタイプを選んでください" />
       <div className="card">
-        <h2>あなたのMBTIタイプを選んでください</h2>
         <p className="sub">タイプが分かる方は「16タイプから選ぶ」、分からない方は「4つの軸から選ぶ」をご利用ください。</p>
 
         <div className="mode-tabs" role="tablist" style={{marginTop: 16}}>
@@ -2327,8 +2558,9 @@ function ResultScreen({ type, questions, answers, onRestart }) {
     <div className="screen">
       {/* (a) キャラクター＆カルチャーフィット度
            キャラは回答から算出したカテゴリスコアとのマッチ度で選定（MBTI固定ではない） */}
+      <section className="result-sec">
+      <SectionTitle en="RESULT" ja="診断結果" />
       <div className="card">
-        <h2>診断結果</h2>
         <div className="char-hero">
           <div className="char-frame">
             <CharaSprite chara={chara.key} size={140} />
@@ -2347,10 +2579,12 @@ function ResultScreen({ type, questions, answers, onRestart }) {
         </div>
         <p className="sub">{fitComment(cultureFit)}</p>
       </div>
+      </section>
 
       {/* (b) 部署別適性 */}
+      <section className="result-sec">
+      <SectionTitle en="APTITUDE" ja="部署別適性" />
       <div className="card">
-        <h2>部署別適性</h2>
         <DeptRadarChart deptScores={deptScores} />
         <div style={{marginTop: 18}}>
           {deptOrder.map(dept => (
@@ -2372,10 +2606,12 @@ function ResultScreen({ type, questions, answers, onRestart }) {
           ))}
         </div>
       </div>
+      </section>
 
       {/* (b-2) カテゴリ別の特性詳細（横棒グラフ＋表） */}
+      <section className="result-sec">
+      <SectionTitle en="ANALYSIS" ja="特性の詳細分析" />
       <div className="card">
-        <h2>特性の詳細分析</h2>
         <p className="sub">76問の回答を10のビジネス特性に分解したスコアです。</p>
         <div className="strength-chips" aria-label="強みと伸びしろのサマリー">
           {topCats.map(k => (
@@ -2415,10 +2651,12 @@ function ResultScreen({ type, questions, answers, onRestart }) {
           </table>
         </div>
       </div>
+      </section>
 
       {/* (b-3) 回答スタイル分析（面接での対話の参考情報） */}
+      <section className="result-sec">
+      <SectionTitle en="STYLE" ja="回答スタイルの傾向" />
       <div className="card">
-        <h2>回答スタイルの傾向</h2>
         <p className="sub">スコアとは別に、回答のしかたそのものから見える傾向です。優劣ではなく、面接での対話のヒントとしてご覧ください。</p>
         <div className="table-scroll" style={{marginTop: 10}}>
           <table className="detail-table">
@@ -2447,10 +2685,12 @@ function ResultScreen({ type, questions, answers, onRestart }) {
           </table>
         </div>
       </div>
+      </section>
 
       {/* (c) タイプ解説 */}
+      <section className="result-sec">
+      <SectionTitle en="TYPE" ja={`${type}（${profile.label}）のビジネス傾向`} />
       <div className="card">
-        <h2>{type}（{profile.label}）のビジネス傾向</h2>
         <div className="profile-section">
           <h3>💪 仕事上の強み</h3>
           <ul>{profile.strengths.map(s => <li key={s}>{s}</li>)}</ul>
@@ -2464,14 +2704,17 @@ function ResultScreen({ type, questions, answers, onRestart }) {
           <p style={{fontSize: "14.5px"}}>{profile.role}</p>
         </div>
       </div>
+      </section>
 
       {/* (d) 免責事項 */}
+      <section className="result-sec">
       <div className="card">
         <div className="disclaimer">
           <strong>ご確認ください（免責事項）</strong>
           {DISCLAIMER_TEXT}
         </div>
       </div>
+      </section>
 
       {/* (e) 印刷・再診断 */}
       <div className="result-actions">
@@ -2534,12 +2777,16 @@ function App() {
 
   return (
     <React.Fragment>
+      {/* 狭い画面のみ表示（広い画面ではサイドバーがロゴを担う） */}
       <header className="app-header">
         <div className="header-box">
           <div className="brand">SANJO KOMUTEN</div>
           <div className="title">株式会社三条工務店 ビジネス適性診断</div>
         </div>
       </header>
+      {/* 広い画面のみ: 左固定サイドバー＋右端の縦書きキャッチ */}
+      <Sidebar screen={screen} />
+      <p className="side-catch" aria-hidden="true">あなたの持ち味を、いっしょに見つけよう。</p>
       <main className="container">
         {screen === "top" && (
           <TopScreen onStart={() => setScreen("type")}
