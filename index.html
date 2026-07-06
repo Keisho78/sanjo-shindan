@@ -50,6 +50,8 @@
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- 結果シートのPDF生成（スマホ対応のダウンロード用: html2canvas + jsPDF 同梱） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <!-- Webフォント: 見出し=Zen Kaku Gothic New / 本文=Noto Sans JP / 英字数字=Raleway -->
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -950,8 +952,8 @@
     display: block; margin-bottom: 6px;
   }
 
-  .result-actions { display: flex; gap: 14px; }
-  .result-actions .btn { flex: 1; }
+  .result-actions { display: flex; flex-wrap: wrap; gap: 14px; }
+  .result-actions .btn { flex: 1 1 200px; }
 
   /* ===== フッター: 建築サイト風のダークな帯 ===== */
   .site-footer {
@@ -3013,7 +3015,37 @@ function PrintSheet({ type, profile, chara, cultureFit, deptScores, bestDept, ca
 }
 
 /* --- 画面4: 結果 --- */
+/* 結果シートをA4一枚のPDFとしてダウンロードする（スマホでも動く）。
+   画面外に .print-sheet の複製を可視状態で置き、html2pdf(html2canvas+jsPDF)で描画する。
+   ライブラリ未読込や生成失敗時はブラウザの印刷ダイアログにフォールバック。 */
+function downloadSheetPdf(applicant, type, onDone) {
+  const sheet = document.querySelector(".print-sheet");
+  if (!sheet || typeof html2pdf === "undefined") {
+    onDone();
+    window.print();
+    return;
+  }
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "position:fixed;left:-10000px;top:0;width:733px;background:#fff;z-index:-1;";
+  const clone = sheet.cloneNode(true);
+  clone.style.display = "block";
+  wrap.appendChild(clone);
+  document.body.appendChild(wrap);
+  const cleanup = () => { document.body.removeChild(wrap); onDone(); };
+  const fname = "適性診断結果_" + (applicant.name || type).replace(/\s+/g, "") + ".pdf";
+  html2pdf().set({
+    margin: [8, 8, 8, 8],
+    filename: fname,
+    image: { type: "jpeg", quality: 0.95 },
+    html2canvas: { scale: 2, backgroundColor: "#ffffff" },
+    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+  }).from(clone).save()
+    .then(cleanup)
+    .catch(() => { cleanup(); window.print(); });
+}
+
 function ResultScreen({ type, questions, answers, applicant, onRestart }) {
+  const [pdfBusy, setPdfBusy] = useState(false);
   const catScores = calcCategoryScores(questions, answers);
   const deptScores = calcDeptScores(catScores, type);
   const cultureFit = calcCultureFit(catScores);
@@ -3206,10 +3238,14 @@ function ResultScreen({ type, questions, answers, applicant, onRestart }) {
       </div>
       </section>
 
-      {/* (e) 印刷・再診断 */}
+      {/* (e) PDF保存・印刷・再診断 */}
       <div className="result-actions">
+        <button className="btn btn-primary" disabled={pdfBusy}
+          onClick={() => { setPdfBusy(true); downloadSheetPdf(applicant, type, () => setPdfBusy(false)); }}>
+          {pdfBusy ? "PDFを生成中…" : "結果をPDFで保存（A4・1枚）"}
+        </button>
         <button className="btn btn-ghost" onClick={() => window.print()}>
-          結果をPDF保存（A4・1枚）
+          印刷する
         </button>
         <button className="btn btn-ghost"
           onClick={() => { if (window.confirm("結果を破棄してトップに戻ります。よろしいですか？")) onRestart(); }}>
